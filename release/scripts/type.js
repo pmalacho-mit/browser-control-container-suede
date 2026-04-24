@@ -3,9 +3,11 @@
 //
 // Usage:
 //   ./scripts/type.js 'input[name="email"]' 'user@example.com'
-//   ./scripts/type.js '#search' 'hello world' --clear      # clear first
-//   ./scripts/type.js '#search' 'hello' --enter            # press Enter after
+//   ./scripts/type.js '#search' 'hello' --clear --enter
 //   ./scripts/type.js '#search' 'hello' --target <tab-id>  # target a specific tab
+//
+// --clear  empties the field before typing.
+// --enter  presses Enter after typing.
 
 import { connect, invokePageFn, getTargetId, printHelp } from "./lib.js";
 
@@ -53,7 +55,7 @@ if (!selector || text === undefined) {
 let client;
 
 try {
-  client = await connect(getTargetId(args));
+  client = await connect(await getTargetId(args));
 
   // Focus the element
   const focusedValue = await invokePageFn(client, focusFn, selector);
@@ -89,18 +91,16 @@ try {
   console.log(`✔ Typed ${text.length} characters`);
 
   if (pressEnter) {
-    await client.Input.dispatchKeyEvent({
-      type: "keyDown",
+    const enterBase = {
       windowsVirtualKeyCode: 13,
       key: "Enter",
       code: "Enter",
-    });
-    await client.Input.dispatchKeyEvent({
-      type: "keyUp",
-      windowsVirtualKeyCode: 13,
-      key: "Enter",
-      code: "Enter",
-    });
+    };
+    await client.Input.dispatchKeyEvent({ type: "keyDown", ...enterBase });
+    // The "char" event is required for Chrome to synthesize a form-submit from
+    // a CDP-injected Enter key. Without it, keyDown alone does not trigger submit.
+    await client.Input.dispatchKeyEvent({ type: "char", text: "\r" });
+    await client.Input.dispatchKeyEvent({ type: "keyUp", ...enterBase });
     console.log("✔ Pressed Enter");
   }
 } catch (err) {

@@ -49,7 +49,7 @@ if (!selector && !waitIdle && !waitLoad) {
 let client;
 
 try {
-  client = await connect(getTargetId(args));
+  client = await connect(await getTargetId(args));
 
   if (waitLoad) {
     await new Promise((resolve, reject) => {

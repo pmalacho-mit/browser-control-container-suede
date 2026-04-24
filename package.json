@@ -1,12 +1,19 @@
 {
   "type": "module",
   "scripts": {
-    "test": "node --import tsx --test"
+    "pretest": "node --import tsx pretest.ts",
+    "test": "node --import tsx --test",
+    "test:all": "npm run test **/*.test.ts",
+    "posttest": "node --import tsx posttest.ts"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
+    "@types/pngjs": "^6.0.5",
     "chrome-remote-interface": "^0.34.0",
     "devtools-protocol": "^0.0.1619965",
+    "dockerode": "^5.0.0",
+    "pixelmatch": "^7.1.0",
+    "pngjs": "^7.0.0",
     "tsx": "^4.21.0"
   }
 }

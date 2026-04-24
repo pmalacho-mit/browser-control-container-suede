@@ -1,4 +1,4 @@
-import { runCmd } from "./exec.js";
+import { runCmd, runCmdWithBufferResult, runCmdWithResult } from "./exec.js";
 
 /**
  * Run an arbitrary `docker` command.
@@ -15,6 +15,21 @@ export const docker = Object.assign(
      */
     exec: async (container: string, args: string[]) =>
       docker(["exec", container, ...args]),
+    /**
+     * Run `docker exec` and always return output + exit code without throwing.
+     * @param container - The container name or id.
+     * @param args - Command and arguments to execute inside the container.
+     */
+    execWithResult: async (container: string, args: string[]) =>
+      runCmdWithResult("docker", ["exec", container, ...args]),
+    /**
+     * Run `docker exec` and return raw Buffer stdout for binary payloads.
+     * Always resolves with output + exit code and does not throw.
+     * @param container - The container name or id.
+     * @param args - Command and arguments to execute inside the container.
+     */
+    execWithBufferResult: async (container: string, args: string[]) =>
+      runCmdWithBufferResult("docker", ["exec", container, ...args]),
     /**
      * Check whether the Docker daemon is reachable.
      * @returns `true` if `docker info` succeeds, `false` otherwise.

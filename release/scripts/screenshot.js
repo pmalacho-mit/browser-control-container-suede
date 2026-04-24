@@ -67,7 +67,7 @@ let outPath = oIdx !== -1 ? args[oIdx + 1] : null;
 let client;
 
 try {
-  client = await connect(getTargetId(args));
+  client = await connect(await getTargetId(args));
 
   // If full-page, get the full document dimensions and set the viewport
   if (fullPage) {

@@ -24,7 +24,13 @@ const showLinks = args.includes("--links");
 const showInputs = args.includes("--inputs");
 const textIdx = args.indexOf("--text");
 const textSelector = textIdx !== -1 ? args[textIdx + 1] : null;
-const selector = args.find((a) => !a.startsWith("--"));
+const targetIdx = args.indexOf("--target");
+const selector = args.find(
+  (arg, index) =>
+    !arg.startsWith("--") &&
+    index !== textIdx + 1 &&
+    index !== targetIdx + 1,
+);
 
 /**
  * @typedef {{ text: string, href: string }} LinkInfo
@@ -122,7 +128,7 @@ const pageOutlineFn = () => {
 
 let client;
 try {
-  client = await connect(getTargetId(args));
+  client = await connect(await getTargetId(args));
 
   if (showLinks) {
     /** @type {LinkInfo[]} */

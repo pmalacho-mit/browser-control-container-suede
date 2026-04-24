@@ -3,11 +3,12 @@
 //
 // Usage:
 //   ./scripts/eval.js 'document.title'
+//   ./scripts/eval.js 'document.querySelectorAll("a").length'
 //   ./scripts/eval.js 'await fetch("/api/status").then(r => r.json())'
-//   echo 'document.title' | ./scripts/eval.js --stdin
+//   echo 'complex_script()' | ./scripts/eval.js --stdin
 //   ./scripts/eval.js --target <id> 'expression'   # evaluate in a specific tab (default: first open tab)
 //
-// The expression runs inside an async context so `await` works.
+// Runs in an async context so `await` is supported.
 
 import { connect, getTargetId, printHelp } from "./lib.js";
 
@@ -21,7 +22,12 @@ if (args.includes("--stdin")) {
   const chunks = [];
   for await (const chunk of process.stdin) chunks.push(chunk);
   expression = Buffer.concat(chunks).toString("utf-8").trim();
-} else expression = args.filter((a) => !a.startsWith("--")).join(" ");
+} else {
+  const targetIdx = args.indexOf("--target");
+  expression = args
+    .filter((a, i) => !a.startsWith("--") && i !== targetIdx + 1)
+    .join(" ");
+}
 
 if (!expression) {
   console.error("Usage: eval.js '<expression>' | eval.js --stdin");
@@ -30,7 +36,7 @@ if (!expression) {
 
 let client;
 try {
-  client = await connect(getTargetId(args));
+  client = await connect(await getTargetId(args));
 
   // Wrap in an async IIFE so `await` works at the top level
   const wrapped = `(async () => { return (${expression}); })()`;

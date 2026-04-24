@@ -67,7 +67,7 @@ const selectFn = (targetSelector) => {
 let client;
 
 try {
-  client = await connect(getTargetId(args));
+  client = await connect(await getTargetId(args));
 
   /** @type {number} */
   let x;

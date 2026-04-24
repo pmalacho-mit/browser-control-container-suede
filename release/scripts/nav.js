@@ -54,7 +54,7 @@ try {
     const { id } = await CDP.New({ port, url: "about:blank" });
     client = await connect(id);
   } else {
-    client = await connect(getTargetId(args));
+    client = await connect(await getTargetId(args));
   }
 
   const loadPromise = waitForLoad(client);
