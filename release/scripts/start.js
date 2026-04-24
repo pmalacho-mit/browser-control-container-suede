@@ -90,6 +90,7 @@ const chromeFlags = [
   "--no-first-run",
   "--no-default-browser-check",
   "--disable-background-networking",
+  "--disable-features=GcmRegistration",
   "--disable-default-apps",
   "--disable-extensions",
   "--disable-sync",
