@@ -3,10 +3,11 @@
 //
 // Usage:
 //   ./scripts/type.js 'input[name="email"]' 'user@example.com'
-//   ./scripts/type.js '#search' 'hello world' --clear    # clear first
-//   ./scripts/type.js '#search' 'hello' --enter           # press Enter after
+//   ./scripts/type.js '#search' 'hello world' --clear      # clear first
+//   ./scripts/type.js '#search' 'hello' --enter            # press Enter after
+//   ./scripts/type.js '#search' 'hello' --target <tab-id>  # target a specific tab
 
-import { connect, invokePageFn, listTargets, printHelp } from "./lib.js";
+import { connect, invokePageFn, getTargetId, printHelp } from "./lib.js";
 
 if (process.argv.includes("--help")) printHelp(import.meta.url);
 
@@ -52,12 +53,7 @@ if (!selector || text === undefined) {
 let client;
 
 try {
-  const targets = await listTargets();
-  if (targets.length === 0) {
-    console.error("No open tabs.");
-    process.exit(1);
-  }
-  client = await connect(targets[0].id);
+  client = await connect(getTargetId(args));
 
   // Focus the element
   const focusedValue = await invokePageFn(client, focusFn, selector);
@@ -111,9 +107,7 @@ try {
   console.error("type failed:", err.message);
   process.exit(1);
 } finally {
-  if (client) {
-    await client.close().catch(() => {
-      /* best effort */
-    });
-  }
+  await client?.close().catch(() => {
+    /* best effort */
+  });
 }

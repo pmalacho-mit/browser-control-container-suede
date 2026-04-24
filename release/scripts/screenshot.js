@@ -2,12 +2,13 @@
 // scripts/screenshot.js  –  Capture a screenshot
 //
 // Usage:
-//   ./scripts/screenshot.js                         # viewport PNG to stdout path
+//   ./scripts/screenshot.js                          # viewport PNG to stdout path
 //   ./scripts/screenshot.js --full                   # full-page screenshot
 //   ./scripts/screenshot.js -o /tmp/shot.png         # custom output path
 //   ./scripts/screenshot.js --format jpeg --quality 80
+//   ./scripts/screenshot.js --target <id>            # capture a specific tab (default: first open tab)
 
-import { connect, invokePageJson, listTargets, printHelp } from "./lib.js";
+import { connect, invokePageJson, getTargetId, printHelp } from "./lib.js";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 
@@ -63,23 +64,10 @@ const quality = parseQuality(qIdx !== -1 ? args[qIdx + 1] : undefined);
 const oIdx = args.indexOf("-o");
 let outPath = oIdx !== -1 ? args[oIdx + 1] : null;
 
-// --target <id>
-const tIdx = args.indexOf("--target");
-const targetId = tIdx !== -1 ? args[tIdx + 1] : undefined;
-
 let client;
 
 try {
-  if (targetId) {
-    client = await connect(targetId);
-  } else {
-    const targets = await listTargets();
-    if (targets.length === 0) {
-      console.error("No open tabs.");
-      process.exit(1);
-    }
-    client = await connect(targets[0].id);
-  }
+  client = await connect(getTargetId(args));
 
   // If full-page, get the full document dimensions and set the viewport
   if (fullPage) {
@@ -119,9 +107,7 @@ try {
   console.error("Screenshot failed:", err.message);
   process.exit(1);
 } finally {
-  if (client) {
-    await client.close().catch(() => {
-      /* best effort */
-    });
-  }
+  await client?.close().catch(() => {
+    /* best effort */
+  });
 }
