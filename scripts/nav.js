@@ -5,13 +5,14 @@
 //   ./scripts/nav.js https://example.com          # navigate current tab
 //   ./scripts/nav.js https://example.com --new     # open in new tab
 //   ./scripts/nav.js https://example.com --wait 5  # extra wait (seconds) after load
+//   ./scripts/nav.js https://example.com --target <id>  # navigate a specific tab (default: first open tab)
 
 import {
   connect,
   invokePageFn,
-  listTargets,
-  waitForLoad,
+  getTargetId,
   printHelp,
+  waitForLoad,
 } from "./lib.js";
 import CDP from "chrome-remote-interface";
 
@@ -47,19 +48,13 @@ const extraWait = extraWaitSec * 1000;
 const port = parseInt(process.env.CDP_PORT || "9222", 10);
 
 let client;
-
 try {
   if (openNew) {
     // Ask the browser to create a new blank target, then navigate it
     const { id } = await CDP.New({ port, url: "about:blank" });
     client = await connect(id);
   } else {
-    const targets = await listTargets();
-    if (targets.length === 0) {
-      console.error("No open tabs. Use --new to create one.");
-      process.exit(1);
-    }
-    client = await connect(targets[0].id);
+    client = await connect(await getTargetId(args));
   }
 
   const loadPromise = waitForLoad(client);
@@ -75,9 +70,7 @@ try {
   console.error("Navigation failed:", err.message);
   process.exit(1);
 } finally {
-  if (client) {
-    await client.close().catch(() => {
-      /* best effort */
-    });
-  }
+  await client?.close().catch(() => {
+    /* best effort */
+  });
 }

@@ -3,12 +3,14 @@
 //
 // Usage:
 //   ./scripts/eval.js 'document.title'
+//   ./scripts/eval.js 'document.querySelectorAll("a").length'
 //   ./scripts/eval.js 'await fetch("/api/status").then(r => r.json())'
-//   echo 'document.title' | ./scripts/eval.js --stdin
+//   echo 'complex_script()' | ./scripts/eval.js --stdin
+//   ./scripts/eval.js --target <id> 'expression'   # evaluate in a specific tab (default: first open tab)
 //
-// The expression runs inside an async context so `await` works.
+// Runs in an async context so `await` is supported.
 
-import { connect, listTargets, printHelp } from "./lib.js";
+import { connect, getTargetId, printHelp } from "./lib.js";
 
 if (process.argv.includes("--help")) printHelp(import.meta.url);
 
@@ -20,28 +22,21 @@ if (args.includes("--stdin")) {
   const chunks = [];
   for await (const chunk of process.stdin) chunks.push(chunk);
   expression = Buffer.concat(chunks).toString("utf-8").trim();
-} else expression = args.filter((a) => !a.startsWith("--")).join(" ");
+} else {
+  const targetIdx = args.indexOf("--target");
+  expression = args
+    .filter((a, i) => !a.startsWith("--") && i !== targetIdx + 1)
+    .join(" ");
+}
 
 if (!expression) {
   console.error("Usage: eval.js '<expression>' | eval.js --stdin");
   process.exit(1);
 }
 
-// --target <id> to pick a specific tab
-const tIdx = args.indexOf("--target");
-const targetId = tIdx !== -1 ? args[tIdx + 1] : undefined;
-
+let client;
 try {
-  let client;
-  if (targetId) client = await connect(targetId);
-  else {
-    const targets = await listTargets();
-    if (targets.length === 0) {
-      console.error("No open tabs.");
-      process.exit(1);
-    }
-    client = await connect(targets[0].id);
-  }
+  client = await connect(await getTargetId(args));
 
   // Wrap in an async IIFE so `await` works at the top level
   const wrapped = `(async () => { return (${expression}); })()`;
@@ -71,4 +66,8 @@ try {
 } catch (err) {
   console.error("eval failed:", err.message);
   process.exit(1);
+} finally {
+  await client?.close().catch(() => {
+    /* best effort */
+  });
 }

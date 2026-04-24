@@ -2,9 +2,12 @@
 // scripts/start.js  –  Launch headless Chromium with remote debugging
 //
 // Usage:
-//   ./scripts/start.js                       # default (blank profile)
-//   ./scripts/start.js --port 9333           # custom CDP port
-//   ./scripts/start.js --user-data-dir /tmp/my-profile
+//   ./scripts/start.js                                  # default headless on :9222
+//   ./scripts/start.js --port 9333                      # custom CDP port
+//   ./scripts/start.js --user-data-dir /data            # persistent profile
+//
+// Starts headless Chromium with remote debugging enabled. The process is
+// detached so you can keep using the shell.
 
 import { spawn } from "node:child_process";
 import { mkdirSync } from "node:fs";

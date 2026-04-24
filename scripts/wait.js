@@ -6,8 +6,9 @@
 //   ./scripts/wait.js 'div.loaded' --timeout 10   # custom timeout (seconds)
 //   ./scripts/wait.js --idle                       # wait for network idle
 //   ./scripts/wait.js --load                       # wait for load event
+//   ./scripts/wait.js 'div.loaded' --target <id>   # wait in a specific tab (default: first open tab)
 
-import { connect, invokePageFn, listTargets, printHelp } from "./lib.js";
+import { connect, invokePageFn, getTargetId, printHelp } from "./lib.js";
 
 if (process.argv.includes("--help")) printHelp(import.meta.url);
 
@@ -48,12 +49,7 @@ if (!selector && !waitIdle && !waitLoad) {
 let client;
 
 try {
-  const targets = await listTargets();
-  if (targets.length === 0) {
-    console.error("No open tabs.");
-    process.exit(1);
-  }
-  client = await connect(targets[0].id);
+  client = await connect(await getTargetId(args));
 
   if (waitLoad) {
     await new Promise((resolve, reject) => {
@@ -120,9 +116,7 @@ try {
   console.error("wait failed:", err.message);
   process.exit(1);
 } finally {
-  if (client) {
-    await client.close().catch(() => {
-      /* best effort */
-    });
-  }
+  await client?.close().catch(() => {
+    /* best effort */
+  });
 }
