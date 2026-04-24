@@ -5,8 +5,9 @@
 //   ./scripts/click.js 'button.submit'                  # CSS selector
 //   ./scripts/click.js --xy 500,300                      # raw coordinates
 //   ./scripts/click.js 'a[href="/login"]' --wait 2       # click then wait 2s
+//   ./scripts/click.js 'button.submit' --target <id>     # click in a specific tab (default: first open tab)
 
-import { connect, invokePageFn, listTargets, printHelp } from "./lib.js";
+import { connect, invokePageFn, getTargetId, printHelp } from "./lib.js";
 
 if (process.argv.includes("--help")) printHelp(import.meta.url);
 
@@ -63,16 +64,10 @@ const selectFn = (targetSelector) => {
   };
 };
 
-/** @type {import("chrome-remote-interface").Client | null} */
 let client;
 
 try {
-  const targets = await listTargets();
-  if (targets.length === 0) {
-    console.error("No open tabs.");
-    process.exit(1);
-  }
-  client = await connect(targets[0].id);
+  client = await connect(getTargetId(args));
 
   /** @type {number} */
   let x;

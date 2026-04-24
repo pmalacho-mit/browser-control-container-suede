@@ -7,13 +7,14 @@
 //   ./scripts/dom.js --links                     # list all links
 //   ./scripts/dom.js --inputs                    # list all input/button/select elements
 //   ./scripts/dom.js --text 'main'               # extract visible text from <main>
+//   ./scripts/dom.js --target <id>               # inspect a specific tab (default: first open tab)
 
 import {
   connect,
   invokePageFn,
   invokePageJson,
-  listTargets,
   printHelp,
+  getTargetId,
 } from "./lib.js";
 
 if (process.argv.includes("--help")) printHelp(import.meta.url);
@@ -67,8 +68,8 @@ const showInputsFn = () => {
     selector: el.id
       ? "#" + el.id
       : el.name
-      ? el.tagName.toLowerCase() + '[name="' + el.name + '"]'
-      : "",
+        ? el.tagName.toLowerCase() + '[name="' + el.name + '"]'
+        : "",
   }));
 
   return JSON.stringify(inputs);
@@ -119,13 +120,9 @@ const pageOutlineFn = () => {
   return JSON.stringify(outline);
 };
 
+let client;
 try {
-  const targets = await listTargets();
-  if (targets.length === 0) {
-    console.error("No open tabs.");
-    process.exit(1);
-  }
-  const client = await connect(targets[0].id);
+  client = await connect(getTargetId(args));
 
   if (showLinks) {
     /** @type {LinkInfo[]} */
@@ -170,9 +167,11 @@ try {
       for (const h of info.headings) console.log(`  ${h.level}  ${h.text}`);
     }
   }
-
-  await client.close();
 } catch (err) {
   console.error("dom failed:", err.message);
   process.exit(1);
+} finally {
+  await client?.close().catch(() => {
+    /* best effort */
+  });
 }

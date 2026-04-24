@@ -5,10 +5,11 @@
 //   ./scripts/eval.js 'document.title'
 //   ./scripts/eval.js 'await fetch("/api/status").then(r => r.json())'
 //   echo 'document.title' | ./scripts/eval.js --stdin
+//   ./scripts/eval.js --target <id> 'expression'   # evaluate in a specific tab (default: first open tab)
 //
 // The expression runs inside an async context so `await` works.
 
-import { connect, listTargets, printHelp } from "./lib.js";
+import { connect, getTargetId, printHelp } from "./lib.js";
 
 if (process.argv.includes("--help")) printHelp(import.meta.url);
 
@@ -27,21 +28,9 @@ if (!expression) {
   process.exit(1);
 }
 
-// --target <id> to pick a specific tab
-const tIdx = args.indexOf("--target");
-const targetId = tIdx !== -1 ? args[tIdx + 1] : undefined;
-
+let client;
 try {
-  let client;
-  if (targetId) client = await connect(targetId);
-  else {
-    const targets = await listTargets();
-    if (targets.length === 0) {
-      console.error("No open tabs.");
-      process.exit(1);
-    }
-    client = await connect(targets[0].id);
-  }
+  client = await connect(getTargetId(args));
 
   // Wrap in an async IIFE so `await` works at the top level
   const wrapped = `(async () => { return (${expression}); })()`;
@@ -71,4 +60,8 @@ try {
 } catch (err) {
   console.error("eval failed:", err.message);
   process.exit(1);
+} finally {
+  await client?.close().catch(() => {
+    /* best effort */
+  });
 }

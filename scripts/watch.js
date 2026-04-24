@@ -2,8 +2,8 @@
 // scripts/watch.js  –  Background logger (console + JS errors + network)
 //
 // Usage:
-//   ./scripts/watch.js           # attach to first tab, log to LOG_DIR
-//   ./scripts/watch.js --target <id>
+//   ./scripts/watch.js                 # attach to first tab, log to LOG_DIR
+//   ./scripts/watch.js --target <id>   # attach to a specific tab (default: first open tab)
 //
 // Logs are written as JSONL to:
 //   $LOG_DIR/<date>/<targetId>.jsonl

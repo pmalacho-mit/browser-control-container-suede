@@ -32,6 +32,25 @@ export async function listTargets() {
 }
 
 /**
+ *
+ * @param {string[]} args
+ */
+export const getTargetId = async (args) => {
+  const index = args.indexOf("--target");
+  const target = index !== -1 ? args[index + 1] : undefined;
+
+  if (target) return target;
+
+  const targets = await listTargets();
+  if (targets.length === 0) {
+    console.error("No open tabs.");
+    process.exit(1);
+  }
+
+  return targets[0].id;
+};
+
+/**
  * Evaluate an expression in the runtime of the connected client.
  * Handles both sync and async expressions.
  * @param {CDP.Client} client
