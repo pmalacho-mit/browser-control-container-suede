@@ -1,5 +1,12 @@
 {
+  "type": "module",
+  "scripts": {
+    "test": "node --import tsx --test"
+  },
   "devDependencies": {
-    "@types/node": "^25.6.0"
+    "@types/node": "^25.6.0",
+    "chrome-remote-interface": "^0.34.0",
+    "devtools-protocol": "^0.0.1619965",
+    "tsx": "^4.21.0"
   }
 }
