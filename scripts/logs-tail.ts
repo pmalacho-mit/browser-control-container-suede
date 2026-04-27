@@ -1,14 +1,14 @@
-#!/usr/bin/env node
-// scripts/logs-tail.js  –  Dump or follow the latest browser log
+#!/usr/bin/env -S npx tsx
+// scripts/logs-tail.ts  –  Dump or follow the latest browser log
 //
 // Usage:
-//   ./scripts/logs-tail.js              # dump current log and exit
-//   ./scripts/logs-tail.js --follow     # keep tailing
-//   ./scripts/logs-tail.js --kind net   # filter by kind (console|error|net:*)
+//   ./scripts/logs-tail.ts              # dump current log and exit
+//   ./scripts/logs-tail.ts --follow     # keep tailing
+//   ./scripts/logs-tail.ts --kind net   # filter by kind (console|error|net:*)
 
 import { readdirSync, readFileSync, watchFile } from "node:fs";
 import { join } from "node:path";
-import { printHelp } from "./lib.js";
+import { printHelp } from "./lib.ts";
 
 if (process.argv.includes("--help")) printHelp(import.meta.url);
 
@@ -18,7 +18,7 @@ const kindIdx = args.indexOf("--kind");
 const kindFilter = kindIdx !== -1 ? args[kindIdx + 1] : null;
 const LOG_DIR = process.env.LOG_DIR || "/tmp/browser-logs";
 
-function findLatestLog() {
+function findLatestLog(): string | null {
   try {
     const dates = readdirSync(LOG_DIR).sort().reverse();
     for (const d of dates) {
@@ -35,19 +35,20 @@ function findLatestLog() {
   return null;
 }
 
-function printLines(content, alreadySeen) {
+function printLines(content: string, alreadySeen: number): number {
   const lines = content.split("\n").filter(Boolean);
   for (let i = alreadySeen; i < lines.length; i++) {
     try {
       const entry = JSON.parse(lines[i]);
       if (kindFilter && !entry.kind?.startsWith(kindFilter)) continue;
-
       const time = new Date(entry.ts).toISOString().slice(11, 23);
       const kind = (entry.kind || "?").padEnd(14);
       const detail =
         entry.text ||
         entry.message ||
-        (entry.url ? `${entry.status || entry.method || ""} ${entry.url}` : "");
+        (entry.url
+          ? `${entry.status || entry.method || ""} ${entry.url}`
+          : "");
       console.log(`${time}  ${kind}  ${detail}`);
     } catch {
       console.log(lines[i]);
@@ -58,7 +59,7 @@ function printLines(content, alreadySeen) {
 
 const logFile = findLatestLog();
 if (!logFile) {
-  console.error("No log files found. Start watch.js first.");
+  console.error("No log files found. Start watch.ts first.");
   process.exit(1);
 }
 
