@@ -6,6 +6,12 @@ controlling it via the Chrome DevTools Protocol (CDP).
 ## Quick Start
 
 ```bash
+docker build --build-arg BROWSER=chromium -t bh-chromium .
+docker build --build-arg BROWSER=firefox  -t bh-firefox  .
+docker build --build-arg BROWSER=webkit   -t bh-webkit   .
+```
+
+```bash
 # Build
 docker build -t browser-control .
 
