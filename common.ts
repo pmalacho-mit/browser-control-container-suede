@@ -6,7 +6,7 @@ import {
 import type { Socket } from "node:net";
 import { before, after } from "node:test";
 import { getDevcontainerIp } from "./suede/programmatic-docker-suede/devcontainer.js";
-import { container } from "./suede/programmatic-docker-suede";
+import { container } from "./programmatic-docker-suede";
 import { CONTAINER_NAME } from "./config.js";
 import { sleep } from "./utils.js";
 

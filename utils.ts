@@ -1,7 +1,12 @@
 import { waitForWsEndpoint } from "./common.js";
-import { type Browser, CONTAINER_NAME, IMAGE_TAG, RELEASE_DIR } from "./config";
-import { container, docker, image } from "./suede/programmatic-docker-suede";
-import { devcontainerNetwork } from "./suede/programmatic-docker-suede/devcontainer.js";
+import {
+  type Browser,
+  CONTAINER_NAME,
+  IMAGE_TAG,
+  RELEASE_DIR,
+} from "./config.js";
+import { container, docker, image } from "./programmatic-docker-suede";
+import { devcontainerNetwork } from "./programmatic-docker-suede/devcontainer.js";
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

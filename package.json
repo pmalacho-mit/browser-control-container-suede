@@ -1,21 +1,25 @@
 {
   "type": "module",
   "scripts": {
-    "pretest": "node --import tsx pretest.ts",
-    "test": "node --import tsx --test",
+    "x": "node --import tsx --",
+    "pretest": "npm run x pretest.ts",
+    "test": "npm run x --test",
     "test:all": "npm run test **/*.test.ts",
-    "posttest": "node --import tsx posttest.ts",
-    "chromium": "node --import tsx browsers/chromium.ts",
-    "webkit": "node --import tsx browsers/webkit.ts",
-    "firefox": "node --import tsx browsers/firefox.ts"
+    "posttest": "npm run x posttest.ts",
+    "chromium": "npm run x release/browsers/chromium.ts",
+    "webkit": "npm run x release/browsers/webkit.ts",
+    "firefox": "npm run x release/browsers/firefox.ts"
+  },
+  "dependencies": {
+    "dockerode": "^5.0.0"
   },
   "devDependencies": {
+    "@playwright/cli": "^0.1.9",
     "@types/dockerode": "^4.0.1",
     "@types/node": "^25.6.0",
     "@types/pngjs": "^6.0.5",
     "chrome-remote-interface": "^0.34.0",
     "devtools-protocol": "^0.0.1619965",
-    "dockerode": "^5.0.0",
     "pixelmatch": "^7.1.0",
     "playwright": "^1.59.1",
     "pngjs": "^7.0.0",

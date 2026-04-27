@@ -1,6 +1,7 @@
-import { BROWSERS } from "./config.js";
-import { buildRunReady } from "./utils.js";
+import { browsers, buildAndRun } from "./release/index.js";
 
-await Promise.allSettled(BROWSERS.map(buildRunReady));
+await Promise.allSettled(
+  browsers.map((browser) => buildAndRun(browser, { log: true })),
+);
 
 console.log("Pretest setup complete. Starting tests...");
