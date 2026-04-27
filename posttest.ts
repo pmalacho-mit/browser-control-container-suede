@@ -1,10 +1,12 @@
-import { container } from "./suede/programmatic-docker-suede/index.js";
-import { CONTAINER_NAME } from "./config.js";
+import { container } from "./suede/programmatic-docker-suede";
+import { CONTAINER_NAME, BROWSERS } from "./config.js";
 
-console.log(`Removing container ${CONTAINER_NAME}...`);
-try {
-  await container.remove(CONTAINER_NAME);
-} catch {
-  // container already gone — fine
+for (const browser of BROWSERS) {
+  const name = CONTAINER_NAME(browser);
+  console.log(`Removing container ${name}...`);
+  try {
+    await container.remove(name);
+  } catch {
+    // ignore if already removed
+  }
 }
-console.log("Cleanup complete.");

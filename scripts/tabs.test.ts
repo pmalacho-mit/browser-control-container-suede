@@ -6,8 +6,8 @@ import {
   createTab,
   execScript,
   fetchCdpTargets,
-} from "./common.js";
-import { CDP_PORT } from "./config.js";
+} from "../common.js";
+import { CDP_PORT } from "../config.js";
 
 describe("tabs.js", () => {
   before(async () => {

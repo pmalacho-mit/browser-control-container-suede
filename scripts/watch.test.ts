@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { execScript, scriptTestFixture, withWatcher } from "./common.js";
+import { execScript, scriptTestFixture, withWatcher } from "../common.js";
 
 describe("watch.js", () => {
   const fixture = scriptTestFixture({

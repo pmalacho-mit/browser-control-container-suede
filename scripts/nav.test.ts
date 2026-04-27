@@ -1,28 +1,28 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { execScript, fetchCdpTargets, scriptTestFixture } from "./common.js";
+import { execScript, fetchCdpTargets, scriptTestFixture } from "../common.js";
 
-describe("nav.js", () => {
+describe("nav.ts", () => {
   const fixture = scriptTestFixture({
     title: "Nav Test",
     body: '<a href="/other">link</a>',
   });
 
   it("navigates current tab", async () => {
-    const nav = await execScript("nav.js", [
+    const nav = await execScript("nav.ts", [
       fixture.serverUrl,
       "--target",
       fixture.tab,
-    ]);
-    assert.equal(nav.exitCode, 0, `nav.js failed: ${nav.stderr}`);
+    ]).complete();
+    assert.equal(nav.exit, 0, `nav.ts failed: ${nav.err}`);
 
-    const evalResult = await execScript("eval.js", [
+    const evalResult = await execScript("eval.ts", [
       "document.title",
       "--target",
       fixture.tab,
-    ]);
-    assert.equal(evalResult.exitCode, 0);
-    assert.equal(evalResult.stdout.trim(), "Nav Test");
+    ]).complete();
+    assert.equal(evalResult.exit, 0);
+    assert.equal(evalResult.out.trim(), "Nav Test");
   });
 
   it("opens in a new tab with --new", async () => {
@@ -30,8 +30,11 @@ describe("nav.js", () => {
       .filter((t) => t.type === "page")
       .map((t) => t.id);
 
-    const nav = await execScript("nav.js", [fixture.serverUrl, "--new"]);
-    assert.equal(nav.exitCode, 0, `nav.js --new failed: ${nav.stderr}`);
+    const nav = await execScript("nav.ts", [
+      fixture.serverUrl,
+      "--new",
+    ]).complete();
+    assert.equal(nav.exit, 0, `nav.ts --new failed: ${nav.err}`);
 
     const after = (await fetchCdpTargets())
       .filter((t) => t.type === "page")
@@ -47,22 +50,22 @@ describe("nav.js", () => {
   });
 
   it("--wait flag does not error", async () => {
-    const nav = await execScript("nav.js", [
+    const nav = await execScript("nav.ts", [
       fixture.serverUrl,
       "--wait",
       "1",
       "--target",
       fixture.tab,
-    ]);
-    assert.equal(nav.exitCode, 0, `nav.js --wait failed: ${nav.stderr}`);
+    ]).complete();
+    assert.equal(nav.exit, 0, `nav.ts --wait failed: ${nav.err}`);
   });
 
   it("invalid URL exits non-zero", async () => {
-    const nav = await execScript("nav.js", [
+    const nav = await execScript("nav.ts", [
       "not-a-url",
       "--target",
       fixture.tab,
-    ]);
-    assert.notEqual(nav.exitCode, 0);
+    ]).complete();
+    assert.notEqual(nav.exit, 0);
   });
 });

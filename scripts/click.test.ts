@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { execScript, evalTab, scriptTestFixture } from "./common.js";
+import { execScript, evalTab, scriptTestFixture } from "../common.js";
 
 describe("click.js", () => {
   const fixture = scriptTestFixture({

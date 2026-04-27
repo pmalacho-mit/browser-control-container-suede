@@ -7,7 +7,7 @@ import {
   execScript,
   navigateTab,
   startTestServer,
-} from "./common.js";
+} from "../common.js";
 
 describe("wait.js", { concurrency: 1 }, () => {
   let tabId: string;

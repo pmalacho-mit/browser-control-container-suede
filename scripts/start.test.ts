@@ -1,8 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { container } from "./suede/programmatic-docker-suede/index.js";
-import { CONTAINER_NAME } from "./config.js";
-import { execScript, fetchCdpVersion, scriptTestFixture } from "./common.js";
+import { container } from "../suede/programmatic-docker-suede/index.js";
+import { CONTAINER_NAME } from "../config.js";
+import { execScript, fetchCdpVersion, scriptTestFixture } from "../common.js";
 
 describe("start.js", () => {
   const fixture = scriptTestFixture({
@@ -24,23 +24,20 @@ describe("start.js", () => {
   });
 
   it("Chrome can reach a server in the devcontainer", async () => {
-    const nav = await execScript("nav.js", [
+    const nav = await execScript("nav.ts", [
       fixture.serverUrl,
       "--target",
       fixture.tab,
-    ]);
-    assert.equal(nav.exitCode, 0, `nav.js failed: ${nav.stderr}`);
+    ]).complete();
+    assert.equal(nav.exit, 0, `nav.js failed: ${nav.err}`);
 
-    const evalResult = await execScript("eval.js", [
+    const evalResult = await execScript("eval.ts", [
       "document.title",
       "--target",
       fixture.tab,
-    ]);
-    assert.equal(
-      evalResult.exitCode,
-      0,
-      `eval.js failed: ${evalResult.stderr}`,
-    );
-    assert.equal(evalResult.stdout.trim(), "Browser Control Test");
+    ]).complete();
+
+    assert.equal(evalResult.exit, 0, `eval.ts failed: ${evalResult.err}`);
+    assert.equal(evalResult.out.trim(), "Browser Control Test");
   });
 });

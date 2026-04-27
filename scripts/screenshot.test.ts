@@ -2,7 +2,7 @@ import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { PNG } from "pngjs";
 import pixelmatch from "pixelmatch";
-import { docker } from "./suede/programmatic-docker-suede";
+import { docker } from "../suede/programmatic-docker-suede/index.js";
 import {
   waitForReady,
   closeTab,
@@ -10,8 +10,8 @@ import {
   execScript,
   navigateTab,
   startTestServer,
-} from "./common.js";
-import { CONTAINER_NAME } from "./config.js";
+} from "../common.js";
+import { CONTAINER_NAME } from "../config.js";
 
 describe("screenshot.js", () => {
   let tabId: string;

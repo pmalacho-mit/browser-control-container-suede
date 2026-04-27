@@ -8,7 +8,7 @@ import {
   navigateTab,
   startTestServer,
   withWatcher,
-} from "./common.js";
+} from "../common.js";
 
 describe("logs-tail.js", () => {
   let tabId: string;

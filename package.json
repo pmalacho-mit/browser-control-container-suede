@@ -4,15 +4,20 @@
     "pretest": "node --import tsx pretest.ts",
     "test": "node --import tsx --test",
     "test:all": "npm run test **/*.test.ts",
-    "posttest": "node --import tsx posttest.ts"
+    "posttest": "node --import tsx posttest.ts",
+    "chromium": "node --import tsx browsers/chromium.ts",
+    "webkit": "node --import tsx browsers/webkit.ts",
+    "firefox": "node --import tsx browsers/firefox.ts"
   },
   "devDependencies": {
+    "@types/dockerode": "^4.0.1",
     "@types/node": "^25.6.0",
     "@types/pngjs": "^6.0.5",
     "chrome-remote-interface": "^0.34.0",
     "devtools-protocol": "^0.0.1619965",
     "dockerode": "^5.0.0",
     "pixelmatch": "^7.1.0",
+    "playwright": "^1.59.1",
     "pngjs": "^7.0.0",
     "tsx": "^4.21.0"
   }
