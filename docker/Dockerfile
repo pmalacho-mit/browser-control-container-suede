@@ -9,7 +9,7 @@ RUN npm install --omit=dev
 
 ENV PATH="/app/node_modules/.bin:$PATH"
 
-# Install only the requested browser + its OS deps
-RUN playwright-cli install "$BROWSER"
+RUN npx playwright install --with-deps "$BROWSER"
+RUN playwright-cli install-browser "$BROWSER"
 
 CMD ["bash"]
