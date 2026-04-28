@@ -1,43 +1,37 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { container } from "../suede/programmatic-docker-suede/index.js";
-import { CONTAINER_NAME } from "../config.js";
-import { execScript, fetchCdpVersion, scriptTestFixture } from "../common.js";
+import { container } from "../programmatic-docker-suede/index.js";
+import defaults from "../release/defaults.js";
+import { runPlaywright, createFixture } from "../common.js";
 
-describe("start.js", () => {
-  const fixture = scriptTestFixture({
+describe("playwright-cli startup", () => {
+  const fixture = fixture({
     title: "Browser Control Test",
     body: "<p>Hello</p>",
   });
 
-  it("container is running", async () => {
-    const running = await container.isRunning(CONTAINER_NAME);
+  it("chromium release container is running", async () => {
+    const running = await container.isRunning(defaults.container("chromium"));
     assert.equal(running, true);
   });
 
-  it("CDP /json/version responds with Chromium", async () => {
-    const body = await fetchCdpVersion();
-    assert.ok(
-      body.Browser?.toLowerCase().includes("chrom"),
-      `Expected Browser to contain "chrom", got: ${body.Browser}`,
-    );
+  it("playwright-cli is available on PATH", async () => {
+    const help = await runPlaywright(["--help"]);
+    assert.equal(help.exit, 0, help.err);
+    assert.match(help.out, /Usage: playwright-cli/);
   });
 
-  it("Chrome can reach a server in the devcontainer", async () => {
-    const nav = await execScript("nav.ts", [
-      fixture.serverUrl,
-      "--target",
-      fixture.tab,
-    ]).complete();
-    assert.equal(nav.exit, 0, `nav.js failed: ${nav.err}`);
+  it("browser session can reach a server in the devcontainer", async () => {
+    const goto = await runPlaywright(["goto", fixture.serverUrl], {
+      session: fixture.session,
+    });
+    assert.equal(goto.exit, 0, goto.err);
 
-    const evalResult = await execScript("eval.ts", [
-      "document.title",
-      "--target",
-      fixture.tab,
-    ]).complete();
-
-    assert.equal(evalResult.exit, 0, `eval.ts failed: ${evalResult.err}`);
-    assert.equal(evalResult.out.trim(), "Browser Control Test");
+    const snapshot = await runPlaywright(["snapshot"], {
+      session: fixture.session,
+    });
+    assert.equal(snapshot.exit, 0, snapshot.err);
+    assert.match(snapshot.out, /Browser Control Test/);
+    assert.match(snapshot.out, /Hello/);
   });
 });

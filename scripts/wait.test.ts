@@ -1,89 +1,70 @@
-import { describe, it, before, after } from "node:test";
+import { after, before, beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  waitForReady,
-  closeTab,
-  createTab,
-  execScript,
-  navigateTab,
+  closeSession,
+  openSession,
+  runPlaywright,
   startTestServer,
+  waitForReady,
 } from "../common.js";
 
-describe("wait.js", { concurrency: 1 }, () => {
-  let tabId: string;
+describe("playwright-cli page state", () => {
   let server: Awaited<ReturnType<typeof startTestServer>>;
+  let session: string;
+  let counter = 0;
 
   before(async () => {
     await waitForReady();
-
     server = await startTestServer((req, res) => {
-      if (req.url === "/ping") {
-        res.writeHead(200, { "Content-Type": "text/plain" });
-        res.end("pong");
-        return;
-      }
+      const title = req.url === "/b" ? "Page B" : "Page A";
       res.writeHead(200, { "Content-Type": "text/html" });
-      res.end(`<!DOCTYPE html><html><head><title>Wait Test</title></head><body>
+      res.end(`<!DOCTYPE html><html><head><title>${title}</title></head><body>
         <script>
-          setTimeout(() => {
-            const el = document.createElement('div');
-            el.className = 'delayed';
-            el.textContent = 'appeared';
-            document.body.appendChild(el);
-          }, 300);
-          fetch('/ping');
+          const current = Number(sessionStorage.getItem('loads') || '0');
+          sessionStorage.setItem('loads', String(current + 1));
         </script>
+        <h1>${title}</h1>
       </body></html>`);
     });
+  });
 
-    const tab = await createTab();
-    tabId = tab.id;
+  beforeEach(async (test) => {
+    session = `page-state-${process.pid}-${counter++}`;
+    await openSession(session, `${server.url}/a`);
+    test.after(async () => {
+      await closeSession(session).catch(() => {});
+    });
   });
 
   after(async () => {
-    await closeTab(tabId);
-    await server?.close();
+    await server.close();
   });
 
-  it("waits for selector that appears", async () => {
-    await navigateTab(tabId, server.url);
+  it("reload refreshes the current page", async () => {
+    const reload = await runPlaywright(["reload"], { session });
+    assert.equal(reload.exit, 0, reload.err);
 
-    const wait = await execScript("wait.js", [".delayed", "--target", tabId]);
-    assert.equal(wait.exitCode, 0, `wait.js failed: ${wait.stderr}`);
+    const loads = await runPlaywright(["sessionstorage-get", "loads"], {
+      session,
+      raw: true,
+    });
+    assert.equal(loads.out.trim(), "2");
   });
 
-  it("times out before element appears", async () => {
-    // Use a selector that will never appear and a short-enough timeout that
-    // docker exec completes reliably (docker exec drops idle connections > ~0.5s).
-    const wait = await execScript("wait.js", [
-      ".nonexistent-xyz123",
-      "--timeout",
-      "0.05",
-      "--target",
-      tabId,
-    ]);
-    assert.notEqual(wait.exitCode, 0);
+  it("go-back returns to the previous page after navigation", async () => {
+    await runPlaywright(["goto", `${server.url}/b`], { session });
+
+    const back = await runPlaywright(["go-back"], { session });
+    assert.equal(back.exit, 0, back.err);
+
+    const snapshot = await runPlaywright(["snapshot"], { session });
+    assert.match(snapshot.out, /Page A/);
   });
 
-  it("--load on already-loaded page", async () => {
-    await navigateTab(tabId, server.url);
-    // Start wait.js first so it has time to attach its loadEventFired listener
-    // before the navigation (triggered below) fires the event.
-    const waitPromise = execScript("wait.js", ["--load", "--target", tabId]);
-    // Give wait.js time to connect to CDP and register the listener.
-    await new Promise((r) => setTimeout(r, 300));
-    // Now trigger a fresh load; wait.js should catch the event.
-    await execScript("nav.js", [server.url, "--target", tabId]);
-    const wait = await waitPromise;
-    assert.equal(wait.exitCode, 0, `wait.js --load failed: ${wait.stderr}`);
-  });
-
-  it("--idle resolves", async () => {
-    await navigateTab(tabId, server.url);
-    // Give network activity time to start and finish
-    await new Promise((r) => setTimeout(r, 500));
-
-    const wait = await execScript("wait.js", ["--idle", "--target", tabId]);
-    assert.equal(wait.exitCode, 0, `wait.js --idle failed: ${wait.stderr}`);
+  it("resize completes successfully", async () => {
+    const resize = await runPlaywright(["resize", "1280", "720"], {
+      session,
+    });
+    assert.equal(resize.exit, 0, resize.err);
   });
 });

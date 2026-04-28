@@ -1,88 +1,66 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { execScript, evalTab, scriptTestFixture } from "../common.js";
+import { runPlaywright, createFixture } from "../common.js";
 
-describe("type.js", () => {
-  const fixture = scriptTestFixture({
+describe("playwright-cli text input", () => {
+  const fixture = fixture({
     title: "Type Test",
-    body: `
-<form onsubmit="window._submitted=true; return false">
-  <input id="inp" type="text" />
-  <button type="submit">Go</button>
-</form>`,
+    body: `<form onsubmit="localStorage.setItem('submitted', document.querySelector('#inp').value); return false">
+        <input id="inp" type="text" oninput="localStorage.setItem('typed', this.value)" />
+        <button type="submit">Go</button>
+      </form>`,
     navigateInitialTab: true,
   });
 
-  it("types into input", async () => {
-    // Clear any prior value
-    await evalTab(fixture.tab, "document.querySelector('#inp').value=''");
+  it("fill writes a full value into an input", async () => {
+    const fill = await runPlaywright(["fill", "#inp", "hello world"], {
+      session: fixture.session,
+    });
+    assert.equal(fill.exit, 0, fill.err);
 
-    const type = await execScript("type.js", [
-      "#inp",
-      "hello world",
-      "--target",
-      fixture.tab,
-    ]);
-    assert.equal(type.exitCode, 0, `type.js failed: ${type.stderr}`);
-
-    const evalResult = await evalTab(
-      fixture.tab,
-      "document.querySelector('#inp').value",
-    );
-    assert.equal(evalResult.exitCode, 0);
-    assert.equal(evalResult.stdout.trim(), "hello world");
+    const value = await runPlaywright(["localstorage-get", "typed"], {
+      session: fixture.session,
+      raw: true,
+    });
+    assert.equal(value.out.trim(), "hello world");
   });
 
-  it("--clear wipes existing value", async () => {
-    // Pre-fill with "foo"
-    await evalTab(fixture.tab, "document.querySelector('#inp').value=''");
-    await execScript("type.js", ["#inp", "foo", "--target", fixture.tab]);
+  it("type appends through the focused editable element", async () => {
+    await runPlaywright(["click", "#inp"], { session: fixture.session });
 
-    // Type "bar" with --clear
-    const type = await execScript("type.js", [
-      "#inp",
-      "bar",
-      "--clear",
-      "--target",
-      fixture.tab,
-    ]);
-    assert.equal(type.exitCode, 0, `type.js --clear failed: ${type.stderr}`);
+    const type = await runPlaywright(["type", "abc"], {
+      session: fixture.session,
+    });
+    assert.equal(type.exit, 0, type.err);
 
-    const evalResult = await evalTab(
-      fixture.tab,
-      "document.querySelector('#inp').value",
-    );
-    assert.equal(evalResult.exitCode, 0);
-    assert.equal(evalResult.stdout.trim(), "bar");
+    const snapshot = await runPlaywright(["snapshot"], {
+      session: fixture.session,
+    });
+    assert.match(snapshot.out, /abc/);
   });
 
-  it("--enter dispatches submit", async () => {
-    // Reset the flag set by the form's onsubmit handler.
-    await evalTab(fixture.tab, "window._submitted = false");
+  it("press Enter submits the focused form", async () => {
+    await runPlaywright(["fill", "#inp", "submitted"], {
+      session: fixture.session,
+    });
+    await runPlaywright(["click", "#inp"], { session: fixture.session });
 
-    const type = await execScript("type.js", [
-      "#inp",
-      "x",
-      "--enter",
-      "--target",
-      fixture.tab,
-    ]);
-    assert.equal(type.exitCode, 0, `type.js --enter failed: ${type.stderr}`);
+    const press = await runPlaywright(["press", "Enter"], {
+      session: fixture.session,
+    });
+    assert.equal(press.exit, 0, press.err);
 
-    // Chrome should translate the CDP Enter keyDown into a form submission,
-    // which fires the form's onsubmit handler setting window._submitted.
-    const evalResult = await evalTab(fixture.tab, "window._submitted");
-    assert.equal(evalResult.exitCode, 0);
-    assert.equal(evalResult.stdout.trim(), "true");
+    const value = await runPlaywright(["localstorage-get", "submitted"], {
+      session: fixture.session,
+      raw: true,
+    });
+    assert.equal(value.out.trim(), "submitted");
   });
 
   it("missing selector exits non-zero", async () => {
-    const type = await execScript("type.js", [
-      "#missing",
-      "text",
-      "--target",
-      fixture.tab,
-    ]);
-    assert.notEqual(type.exitCode, 0);
+    const fill = await runPlaywright(["fill", "#missing", "text"], {
+      session: fixture.session,
+    });
+    assert.notEqual(fill.exit, 0);
   });
 });

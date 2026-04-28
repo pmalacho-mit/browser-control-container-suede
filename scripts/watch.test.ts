@@ -1,103 +1,48 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { execScript, scriptTestFixture, withWatcher } from "../common.js";
+import { runPlaywright, createFixture } from "../common.js";
 
-describe("watch.js", () => {
-  const fixture = scriptTestFixture({
-    title: "Watch Test",
-    body: `<script>/* console.log called by eval later */</script>`,
+describe("playwright-cli devtools helpers", () => {
+  const fixture = fixture({
+    title: "Helpers Test",
+    body: `<button id="action">Action</button><div id="output"></div>`,
     navigateInitialTab: true,
   });
 
-  it("starts without error", async () => {
-    const { stderr } = await withWatcher(fixture.tab, async () => {
-      // do nothing — just verify it starts
+  it("highlight and hide both succeed", async () => {
+    const highlight = await runPlaywright(["highlight", "#action"], {
+      session: fixture.session,
     });
-    // stderr may contain the "Watching tab" message, but shouldn't contain "failed"
-    assert.ok(
-      !stderr.includes("watch failed"),
-      `watch.js had error output: ${stderr}`,
-    );
+    assert.equal(highlight.exit, 0, highlight.err);
+
+    const hide = await runPlaywright(["highlight", "#action", "--hide"], {
+      session: fixture.session,
+    });
+    assert.equal(hide.exit, 0, hide.err);
   });
 
-  it("console events appear in log", async () => {
-    const { logLines } = await withWatcher(fixture.tab, async () => {
-      await execScript("eval.js", [
-        'console.log("sentinel-value-abc")',
-        "--target",
-        fixture.tab,
-      ]);
+  it("generate-locator emits a locator for an element", async () => {
+    const locator = await runPlaywright(["generate-locator", "#action"], {
+      session: fixture.session,
+      raw: true,
     });
-
-    const consoleEntries = logLines
-      .map((l) => {
-        try {
-          return JSON.parse(l);
-        } catch {
-          return null;
-        }
-      })
-      .filter((e) => e && e.kind === "console");
-
-    const found = consoleEntries.some(
-      (e: any) => e.text && e.text.includes("sentinel-value-abc"),
-    );
-    assert.ok(
-      found,
-      `Expected to find "sentinel-value-abc" in console log entries. Entries: ${JSON.stringify(consoleEntries)}`,
-    );
+    assert.equal(locator.exit, 0, locator.err);
+    assert.ok(locator.out.trim().length > 0, "Expected locator output");
   });
 
-  it("network events appear in log", async () => {
-    const { logLines } = await withWatcher(fixture.tab, async () => {
-      await execScript("eval.js", [
-        'fetch("/ping").catch(() => {})',
-        "--target",
-        fixture.tab,
-      ]);
-    });
-
-    const netEntries = logLines
-      .map((l) => {
-        try {
-          return JSON.parse(l);
-        } catch {
-          return null;
-        }
-      })
-      .filter(
-        (e) => e && typeof e.kind === "string" && e.kind.startsWith("net:"),
-      );
-
-    assert.ok(
-      netEntries.length > 0,
-      `Expected at least one net:* entry. Lines: ${JSON.stringify(logLines)}`,
+  it("run-code can update the page for later commands", async () => {
+    const code = await runPlaywright(
+      [
+        "run-code",
+        "async page => { await page.locator('#output').evaluate(el => el.textContent = 'updated'); }",
+      ],
+      { session: fixture.session },
     );
-  });
+    assert.equal(code.exit, 0, code.err);
 
-  it("JS errors are captured", async () => {
-    const { logLines } = await withWatcher(fixture.tab, async () => {
-      // This will throw a ReferenceError
-      await execScript("eval.js", [
-        "undefinedVariable12345.x",
-        "--target",
-        fixture.tab,
-      ]);
+    const snapshot = await runPlaywright(["snapshot"], {
+      session: fixture.session,
     });
-
-    const errorEntries = logLines
-      .map((l) => {
-        try {
-          return JSON.parse(l);
-        } catch {
-          return null;
-        }
-      })
-      .filter((e) => e && e.kind === "error");
-
-    assert.ok(
-      errorEntries.length > 0,
-      `Expected at least one error entry. Lines: ${JSON.stringify(logLines)}`,
-    );
+    assert.match(snapshot.out, /updated/);
   });
 });

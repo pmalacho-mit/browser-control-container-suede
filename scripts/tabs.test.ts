@@ -1,102 +1,68 @@
-import { describe, it, before } from "node:test";
+import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import {
-  waitForReady,
-  closeTab,
-  createTab,
-  execScript,
-  fetchCdpTargets,
-} from "../common.js";
-import { CDP_PORT } from "../config.js";
+import { runPlaywright, createFixture } from "../common.js";
 
-describe("tabs.js", () => {
-  before(async () => {
-    await waitForReady();
+describe("playwright-cli tabs", () => {
+  const fixture = fixture({
+    title: "Tabs Test",
+    body: "<p>tab body</p>",
+    navigateInitialTab: true,
   });
 
-  it("lists tabs", async () => {
-    // Snapshot current page count before creating our tab
-    const before = (await fetchCdpTargets()).filter((t) => t.type === "page");
-    const tab = await createTab();
-    try {
-      const result = await execScript("tabs.js");
-      assert.equal(result.exitCode, 0, `tabs.js failed: ${result.stderr}`);
-      assert.ok(
-        result.stdout.includes(`${before.length + 1} tab(s)`),
-        `Expected "${before.length + 1} tab(s)" in stdout, got: ${result.stdout}`,
-      );
-    } finally {
-      await closeTab(tab.id);
-    }
+  it("tab-list shows the current tab", async () => {
+    const list = await runPlaywright(["tab-list"], {
+      session: fixture.session,
+    });
+    assert.equal(list.exit, 0, list.err);
+    assert.match(list.out, /0: \(current\)/);
   });
 
-  it("count increases after new tab", async () => {
-    // Snapshot current page count, then create 2 tabs
-    const beforeTargets = (await fetchCdpTargets()).filter(
-      (t) => t.type === "page",
+  it("tab-new adds another tab", async () => {
+    const created = await runPlaywright(
+      ["tab-new", `${fixture.serverUrl}?tab=2`],
+      {
+        session: fixture.session,
+      },
     );
-    const tab1 = await createTab();
-    const tab2 = await createTab();
-    try {
-      const result = await execScript("tabs.js");
-      assert.equal(result.exitCode, 0, `tabs.js failed: ${result.stderr}`);
-      assert.ok(
-        result.stdout.includes(`${beforeTargets.length + 2} tab(s)`),
-        `Expected "${beforeTargets.length + 2} tab(s)" in stdout, got: ${result.stdout}`,
-      );
-    } finally {
-      await closeTab(tab1.id);
-      await closeTab(tab2.id);
-    }
+    assert.equal(created.exit, 0, created.err);
+
+    const list = await runPlaywright(["tab-list"], {
+      session: fixture.session,
+    });
+    assert.match(list.out, /0: \(current\)/);
+    assert.match(list.out, /1:/);
+    assert.match(list.out, /tab=2/);
   });
 
-  it("--close removes one tab", async () => {
-    const tab1 = await createTab();
-    const tab2 = await createTab();
+  it("tab-select changes the current tab", async () => {
+    await runPlaywright(["tab-new", `${fixture.serverUrl}?tab=2`], {
+      session: fixture.session,
+    });
 
-    const close = await execScript("tabs.js", ["--close", tab2.id]);
-    assert.equal(close.exitCode, 0, `tabs.js --close failed: ${close.stderr}`);
+    const select = await runPlaywright(["tab-select", "1"], {
+      session: fixture.session,
+    });
+    assert.equal(select.exit, 0, select.err);
 
-    try {
-      // Verify tab2 is gone and tab1 still exists
-      const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-      const targets = (
-        (await res.json()) as Array<{ id: string; type: string }>
-      ).filter((t) => t.type === "page");
-      const ids = targets.map((t) => t.id);
-      assert.ok(!ids.includes(tab2.id), "Closed tab should no longer appear");
-      assert.ok(ids.includes(tab1.id), "Other tab should still exist");
-    } finally {
-      // tab2 was closed by the script; just close tab1
-      await closeTab(tab1.id);
-    }
+    const list = await runPlaywright(["tab-list"], {
+      session: fixture.session,
+    });
+    assert.match(list.out, /1: \(current\)/);
   });
 
-  it("--close-all leaves at most 1 tab", async () => {
-    // Create 3 extra tabs so --close-all has something to do
-    const tab1 = await createTab();
-    const tab2 = await createTab();
-    const tab3 = await createTab();
+  it("tab-close removes a tab", async () => {
+    await runPlaywright(["tab-new", `${fixture.serverUrl}?tab=2`], {
+      session: fixture.session,
+    });
 
-    const close = await execScript("tabs.js", ["--close-all"]);
-    assert.equal(
-      close.exitCode,
-      0,
-      `tabs.js --close-all failed: ${close.stderr}`,
-    );
+    const close = await runPlaywright(["tab-close", "1"], {
+      session: fixture.session,
+    });
+    assert.equal(close.exit, 0, close.err);
 
-    const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json`);
-    const targets = ((await res.json()) as Array<{ type: string }>).filter(
-      (t) => t.type === "page",
-    );
-    assert.ok(
-      targets.length <= 1,
-      `Expected at most 1 tab remaining, got ${targets.length}`,
-    );
-    // Any remaining tabs from our create calls were closed by the script;
-    // do a best-effort cleanup on the one that may have survived (first created).
-    for (const id of [tab1.id, tab2.id, tab3.id]) {
-      await closeTab(id).catch(() => {});
-    }
+    const list = await runPlaywright(["tab-list"], {
+      session: fixture.session,
+    });
+    assert.doesNotMatch(list.out, /1:/);
   });
 });

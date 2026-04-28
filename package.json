@@ -1,14 +1,13 @@
 {
   "type": "module",
   "scripts": {
-    "x": "node --import tsx --",
-    "pretest": "npm run x pretest.ts",
-    "test": "npm run x --test",
-    "test:all": "npm run test **/*.test.ts",
-    "posttest": "npm run x posttest.ts",
-    "chromium": "npm run x release/browsers/chromium.ts",
-    "webkit": "npm run x release/browsers/webkit.ts",
-    "firefox": "npm run x release/browsers/firefox.ts"
+    "pretest": "node --import tsx pretest.ts",
+    "posttest": "node --import tsx posttest.ts",
+    "test": "node --import tsx --test",
+    "test:all": "npm run test -- tests/*.test.ts",
+    "chromium": "node --import tsx release/browsers/chromium.ts",
+    "webkit": "node --import tsx release/browsers/webkit.ts",
+    "firefox": "node --import tsx release/browsers/firefox.ts"
   },
   "dependencies": {
     "dockerode": "^5.0.0"

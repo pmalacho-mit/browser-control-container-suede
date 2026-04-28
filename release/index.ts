@@ -67,5 +67,76 @@ export const buildAndRun = async (BROWSER: Browser, details?: Options) => {
   const network = await devcontainerNetwork();
 
   const command = details?.command ?? defaults.command;
-  return container.run({ network, image: tag, name, command });
+  return container.run({ network, name, command, image: tag });
 };
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+type PlaywrightCliOptions = {
+  session?: string;
+  /** output response as JSON */
+  json?: boolean;
+  /** output only the result value, without status and code */
+  raw?: boolean;
+};
+
+export const playwright = {
+  args: (args: string[], options?: PlaywrightCliOptions) => [
+    "playwright-cli",
+    ...(options?.session ? [`-s=${options.session}`] : []),
+    ...(options?.json ? ["--json"] : []),
+    ...(options?.raw ? ["--raw"] : []),
+    ...args,
+  ],
+  exec: (name: string, args: string[], options?: PlaywrightCliOptions) =>
+    container.exec(name, playwright.args(args, options)),
+  run: async (
+    container: string,
+    args: string[],
+    options?: PlaywrightCliOptions,
+  ) => {
+    const result = await playwright.exec(container, args, options).complete();
+    if (result.exit !== 0)
+      throw new Error(`playwright-cli ${args[0]} failed: ${result.err}`);
+    return result;
+  },
+  json: async <T>(
+    container: string,
+    args: string[],
+    options?: Omit<PlaywrightCliOptions, "json">,
+  ) => {
+    const result = await playwright.run(container, args, {
+      ...options,
+      json: true,
+    });
+    return result.out.trim() ? (JSON.parse(result.out) as T) : undefined;
+  },
+  open: (
+    container: string,
+    browser: Browser,
+    session: string,
+    url: string = "about:blank",
+  ) =>
+    playwright.run(container, ["open", url, "--browser", browser], { session }),
+  close: (container: string, session: string) =>
+    playwright.run(container, ["close"], { session }),
+  list: (container: string) =>
+    playwright
+      .json<{ browsers: Array<Record<string, unknown>> }>(container, ["list"])
+      .then((result) => result?.browsers ?? []),
+  ready: async (
+    name: string,
+    maxAttempts: number = 20,
+    delayMs: number = 250,
+  ): Promise<void> => {
+    for (let i = 0; i < maxAttempts; i++) {
+      if (await container.isRunning(name))
+        if (await playwright.json(name, ["list"])) return;
+      await sleep(delayMs);
+    }
+    throw new Error(`Playwright CLI not ready in container ${name}`);
+  },
+};
+
+export const readFile = (name: string, path: string) =>
+  container.exec(name, ["cat", path]).complete({ out: "buffer" });
