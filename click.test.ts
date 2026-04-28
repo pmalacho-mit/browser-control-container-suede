@@ -1,15 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { playwright } from "../release/index.js";
-import { suite } from "../common.js";
+import { playwright } from "./release/index.js";
+import { suite } from "./common.js";
 
 suite(
   "click actions",
   {
-    title: "Click Test",
-    body: `<button id="btn" onclick="localStorage.setItem('clicked','yes')">Click Me</button>
+    serve: {
+      title: "Click Test",
+      body: `<button id="btn" onclick="localStorage.setItem('clicked','yes')">Click Me</button>
       <button id="dbl" ondblclick="localStorage.setItem('dblclicked','yes')">Double Click</button>
       <div id="hover" onmouseenter="localStorage.setItem('hovered','yes')">Hover Me</div>`,
+    },
     navigateInitialTab: true,
   },
   (fixture) => {

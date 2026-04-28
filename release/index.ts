@@ -1,7 +1,9 @@
 import { resolve } from "node:path";
 import { container, image } from "../programmatic-docker-suede";
 import { devcontainerNetwork } from "../programmatic-docker-suede/devcontainer.js";
-import CommandStream from "../programmatic-docker-suede/CommandStream.js";
+import CommandStream, {
+  type CompletedResult,
+} from "../programmatic-docker-suede/CommandStream.js";
 import defaults from "./defaults.js";
 
 /**
@@ -90,14 +92,21 @@ export const playwright = {
   ],
   exec: (name: string, args: string[], options?: PlaywrightCliOptions) =>
     container.exec(name, playwright.args(args, options)),
+  /** CLI does not return non-zero exit codes on error */
+  errored: async (stream: CommandStream) => {
+    const { out } = await stream.complete();
+    return out.startsWith("### Error\n");
+  },
   run: async (
     container: string,
     args: string[],
     options?: PlaywrightCliOptions,
   ) => {
     const result = await playwright.exec(container, args, options).complete();
+
     if (result.exit !== 0)
       throw new Error(`playwright-cli ${args[0]} failed: ${result.err}`);
+
     return result;
   },
   json: async <T>(

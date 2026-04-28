@@ -1,17 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { playwright } from "../release/index.js";
-import { suite } from "../common.js";
+import { playwright } from "./release/index.js";
+import { suite } from "./common.js";
 
 suite(
   "run-code and storage",
   {
-    title: "Storage Test",
-    body: `<div id="app">ready</div>
+    serve: {
+      title: "Storage Test",
+      body: `<div id="app">ready</div>
       <script>
         localStorage.setItem('boot', 'ready');
         sessionStorage.setItem('page', 'storage-test');
       </script>`,
+    },
     navigateInitialTab: true,
   },
   (fixture) => {

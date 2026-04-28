@@ -1,16 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { playwright } from "../release/index.js";
-import { suite } from "../common.js";
+import { playwright } from "./release/index.js";
+import { suite } from "./common.js";
 
 suite(
   "DOM snapshot and locator generation",
   {
-    title: "DOM Test",
-    body: `<h1>Main Heading</h1>
+    serve: {
+      title: "DOM Test",
+      body: `<h1>Main Heading</h1>
       <a href="/x">Test Link</a>
       <input type="text" id="myinput" placeholder="enter text" />
       <p>visible text here</p>`,
+    },
     navigateInitialTab: true,
   },
   (fixture) => {

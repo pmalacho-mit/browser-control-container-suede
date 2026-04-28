@@ -4,7 +4,7 @@
     "pretest": "node --import tsx pretest.ts",
     "posttest": "node --import tsx posttest.ts",
     "test": "node --import tsx --test",
-    "test:all": "npm run test -- tests/*.test.ts",
+    "test:all": "CONCURRENCY=${CONCURRENCY:-$(docker info --format '{{.NCPU}}' | awk '{print int($1/2)}')} && npm run test -- --test-concurrency=$CONCURRENCY *.test.ts",
     "chromium": "node --import tsx release/browsers/chromium.ts",
     "webkit": "node --import tsx release/browsers/webkit.ts",
     "firefox": "node --import tsx release/browsers/firefox.ts"

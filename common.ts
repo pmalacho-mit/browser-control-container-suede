@@ -65,15 +65,18 @@ export const startTestServer = async (
 
 type FixtureOptions = {
   browser: Browser;
-  title: string;
-  body: string;
   navigateInitialTab?: boolean;
+  serve:
+    | RequestHandler
+    | {
+        title: string;
+        body: string;
+      };
 };
 
 export const createFixture = ({
   browser,
-  title,
-  body,
+  serve,
   navigateInitialTab = false,
 }: FixtureOptions) => {
   let server: Awaited<ReturnType<typeof startTestServer>> | undefined;
@@ -83,12 +86,14 @@ export const createFixture = ({
   before(async () => {
     await playwright.ready(container);
     server = await startTestServer(
-      `<!DOCTYPE html><html><head><title>${title}</title></head><body>${body}</body></html>`,
+      "body" in serve
+        ? `<!DOCTYPE html><html><head><title>${serve.title}</title></head><body>${serve.body}</body></html>`
+        : serve,
     );
   });
 
   beforeEach(async () => {
-    session = `${slugify(title)}-${process.pid}-${sessionCounter++}`;
+    session = `${slugify("title" in serve ? serve.title : "session")}-${process.pid}-${sessionCounter++}`;
     await playwright.open(
       container,
       browser,
