@@ -26,7 +26,7 @@ bash <(curl https://raw.githubusercontent.com/pmalacho-mit/suede/refs/heads/main
 > [!WARNING]
 > The test suite spawns Docker containers and can exhaust Docker daemon CPU and memory resources under high concurrency. Always run the full suite with a concurrency limit.
 
-Run all tests with the default concurrency limit (2 parallel test files):
+Run all tests with the default concurrency limit (which is calculated as half of the available CPU cores on the Docker host, i.e. `docker info --format '{{.NCPU}}' | awk '{print int($1/2)}'`):
 
 ```bash
 npm run test:all
