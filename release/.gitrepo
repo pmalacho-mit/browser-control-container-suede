@@ -6,7 +6,7 @@
 [subrepo]
 	remote = https://github.com/pmalacho-mit/browser-control-container-suede
 	branch = release
-	commit = 9f090c9126493d4062231d0efca8a0b5022431e0
-	parent = de41d4f0c2f277860a8b75f5b929b2a426c2d92e
+	commit = 1f2d03f9c73e6a74f1eed7f328ed0c42d02e888f
+	parent = 4e9d940d2edf76675feb4d258f56f8749f9fc2e6
 	method = merge
 	cmdver = 0.4.9
