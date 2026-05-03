@@ -1,9 +1,7 @@
 import { resolve } from "node:path";
 import { container, image } from "../programmatic-docker-suede";
 import { devcontainerNetwork } from "../programmatic-docker-suede/devcontainer.js";
-import CommandStream, {
-  type CompletedResult,
-} from "../programmatic-docker-suede/CommandStream.js";
+import CommandStream from "../programmatic-docker-suede/CommandStream.js";
 import defaults from "./defaults.js";
 
 /**
@@ -24,7 +22,8 @@ const context = resolve(__dirname, "docker");
 type Options = Partial<
   typeof defaults & {
     onBuild: (stream: CommandStream) => void;
-    log?: boolean;
+    log: boolean;
+    network: string;
   }
 >;
 
@@ -66,7 +65,7 @@ export const buildAndRun = async (BROWSER: Browser, details?: Options) => {
   if (exit !== 0)
     throw new Error(`Build failed for ${tag} with error:\n${err}`);
 
-  const network = await devcontainerNetwork();
+  const network = details?.network ?? (await devcontainerNetwork());
 
   const command = details?.command ?? defaults.command;
   return container.run({ network, name, command, image: tag });
@@ -145,6 +144,97 @@ export const playwright = {
     }
     throw new Error(`Playwright CLI not ready in container ${name}`);
   },
+  parseCurrentTab: ({ out }: CompletedResult) => {
+    const match = out.match(/^- (\d+):\s*\(current\)/m);
+    if (match) return parseInt(match[1], 10);
+    throw new Error(
+      `Failed to get current tab index from output after creating tab:\n${out}`,
+    );
+  },
+
+  newTab: async (
+    container: string,
+    url: string = "about:blank",
+    session?: string,
+  ) =>
+    playwright
+      .run(container, ["tab-new", url], { session, raw: true })
+      .then(playwright.parseCurrentTab),
+
+  selectTab: async (container: string, index: number, session?: string) => {
+    const result = playwright.parseCurrentTab(
+      await playwright.run(container, ["tab-select", index.toString()], {
+        session,
+        raw: true,
+      }),
+    );
+    if (result !== index)
+      throw new Error(
+        `Failed to select tab ${index}, current tab is ${result}`,
+      );
+  },
+
+  console: async (container: string, session?: string) =>
+    playwright
+      .run(container, ["console"], { session, raw: true })
+      .then(({ out }) => out),
+
+  evaluate: async <Return>(
+    container: string,
+    fn: () => Return,
+    session?: string,
+  ) =>
+    playwright
+      .run(container, ["eval", fn.toString()], { session, raw: true })
+      .then(({ out }) =>
+        out && out.trim() !== "undefined"
+          ? (JSON.parse(out.trim()) as Return)
+          : undefined,
+      ),
+};
+
+export const sessionWithTabs = async (
+  container: string,
+  session: string,
+  browser: Browser,
+) => {
+  await playwright.open(container, browser, session);
+
+  const selectTab = (index: number) =>
+    playwright.selectTab(container, index, session);
+
+  let queue = Promise.resolve();
+
+  /**
+   * No-op used to advance the tail of a promise chain,
+   * regardless of success/failure so it never stalls.
+   */
+  const advance = () => {};
+
+  const withTabSelected = <Return>(
+    index: number,
+    fn: () => Return,
+  ): Promise<Awaited<Return>> => {
+    const result = queue.then(async () => {
+      await selectTab(index);
+      return fn();
+    }) as Promise<Awaited<Return>>;
+    queue = result.then(advance, advance);
+    return result;
+  };
+
+  return {
+    selectTab,
+    withTabSelected,
+    newTab: (url: string = "about:blank") =>
+      playwright.newTab(container, url, session),
+    evaluateOnTab: <Return>(index: number, fn: () => Return) =>
+      withTabSelected(index, () =>
+        playwright.evaluate<Return>(container, fn, session),
+      ),
+    consoleForTab: (index: number) =>
+      withTabSelected(index, () => playwright.console(container, session)),
+  };
 };
 
 export const readFile = (name: string, path: string) =>
