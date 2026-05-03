@@ -29,6 +29,16 @@ type Options = Partial<
   }
 >;
 
+export const tryRemove = async (
+  browser: Browser,
+  details?: Pick<Options, "container" | "log">,
+) => {
+  try {
+    await container.remove((details?.container ?? defaults.container)(browser));
+    if (details?.log) console.log(`Removed existing container for ${browser}`);
+  } catch {}
+};
+
 /**
  *
  * @param BROWSER
@@ -40,9 +50,7 @@ export const buildAndRun = async (BROWSER: Browser, details?: Options) => {
   const name = (details?.container ?? defaults.container)(BROWSER);
   const tag = (details?.image ?? defaults.image)(BROWSER);
 
-  if (details?.log)
-    console.log(`(Try) Removing existing container for ${BROWSER}`);
-  await container.tryRemove(name);
+  await tryRemove(BROWSER, details);
 
   if (details?.log) console.log(`Building image ${tag} from ${context}...`);
 
@@ -205,7 +213,10 @@ export const sessionWithTabs = async (
    */
   const advance = () => {};
 
-  const withTabSelected = <Return>(index: number, fn: () => Return) => {
+  const withTabSelected = <Return>(
+    index: number,
+    fn: () => Return,
+  ): Promise<Awaited<Return>> => {
     const result = queue.then(async () => {
       await selectTab(index);
       return fn();
