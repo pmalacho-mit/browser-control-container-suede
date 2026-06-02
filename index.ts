@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { container, image } from "../programmatic-docker-suede";
-import { devcontainerNetwork } from "../programmatic-docker-suede/devcontainer.js";
+import devcontainer from "../programmatic-docker-suede/devcontainer.js";
 import CommandStream, {
   type CompletedResult,
 } from "../programmatic-docker-suede/CommandStream.js";
@@ -59,7 +59,7 @@ export const buildAndRun = async (BROWSER: Browser, details?: Options) => {
   if (exit !== 0)
     throw new Error(`Build failed for ${tag} with error:\n${err}`);
 
-  const network = details?.network ?? (await devcontainerNetwork());
+  const network = details?.network ?? (await devcontainer.network());
 
   const command = details?.command ?? defaults.command;
   return container.run({ network, name, command, image: tag });
