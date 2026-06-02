@@ -6,7 +6,7 @@
 [subrepo]
 	remote = https://github.com/pmalacho-mit/programmatic-docker-suede
 	branch = release
-	commit = 3b59595d18bb161682c5a0a37a50bbaae549f9aa
-	parent = 0f8e80a541a335bd85e83fe97c759e07362f6492
+	commit = a30c441a34c681c89ed3770b875f0f0ade8099f1
+	parent = b48bf404e1140b8b5fd3cd13497875a99c1b2482
 	method = merge
 	cmdver = 0.4.9

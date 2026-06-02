@@ -3,10 +3,35 @@ import { PassThrough } from "node:stream";
 import CommandStream from "./CommandStream.js";
 import { execFileAsync } from "./exec.js";
 
+type FollowProgressEvent = {
+  stream?: string;
+  error?: string;
+  [key: string]: unknown;
+};
+
 /** The underlying Dockerode instance (for advanced use cases). */
-const dockerode = new Dockerode();
+const dockerode = new Dockerode() as Dockerode & {
+  /**
+   * The `followProgress` method is not included in the Dockerode type definitions, so we augment the type here.
+   * Added to library via: https://github.com/apocas/dockerode/pull/824
+   * @param stream
+   * @param onFinished
+   * @param onProgress
+   * @returns
+   */
+  followProgress: (
+    stream: NodeJS.ReadableStream,
+    onFinished: (err: Error | null, output: FollowProgressEvent[]) => void,
+    onProgress?: (event: FollowProgressEvent) => void,
+  ) => void;
+};
 
 export { dockerode };
+
+const tryer =
+  <Fn extends (...args: any[]) => Promise<any>>(fn: Fn) =>
+  (...args: Parameters<Fn>): ReturnType<Fn> | Promise<undefined> =>
+    fn(...args).catch(() => {});
 
 /**
  * Escape hatch: run an arbitrary `docker` CLI command.
@@ -38,6 +63,38 @@ export const docker = Object.assign(
         return false;
       }
     },
+    ...(() => {
+      /**
+       * Creates a Docker network.
+       * @param Name - The name of the network.
+       */
+      const createNetwork = async (Name: string) =>
+        dockerode.createNetwork({ Name });
+      return {
+        createNetwork,
+        /**
+         * Attempt to create a Docker network, silently ignores errors (e.g. already exists).
+         * @param Name - The name of the network.
+         */
+        tryCreateNetwork: tryer(createNetwork),
+      };
+    })(),
+    ...(() => {
+      /**
+       * Removes a Docker network.
+       * @param Name - The name of the network.
+       */
+      const removeNetwork = async (Name: string) =>
+        dockerode.getNetwork(Name).remove();
+      return {
+        removeNetwork,
+        /**
+         * Attempt to remove a Docker network, silently ignores errors (e.g. does not exist).
+         * @param Name - The name of the network.
+         */
+        tryRemoveNetwork: tryer(removeNetwork),
+      };
+    })(),
   },
 );
 
@@ -58,41 +115,61 @@ export const image = {
   build: (
     tag: string,
     context: string,
-    options?: ImageBuildOptions,
+    options?: ImageBuildOptions & {
+      /**
+       * Restrict the context to specific files or directories.
+       * If you experience much longer build times than expected,
+       * try setting this to only the files needed for the build.
+       */
+      include?: string[];
+    },
   ): CommandStream =>
     new CommandStream(dockerode, async () => {
+      const { include, ...buildOptions } = options ?? {};
       const src = await dockerode.buildImage(
-        { context, src: ["."] },
-        { t: tag, ...(options ?? {}) },
+        { context, src: include ?? ["."] },
+        { t: tag, ...buildOptions },
       );
 
       const out = new PassThrough();
-      let hasError = false;
+      let resolveExit!: (code: number) => void;
+      const exitCodePromise = new Promise<number>((res) => (resolveExit = res));
 
-      src.on("data", (chunk: Buffer) => {
-        for (const line of chunk.toString("utf-8").split("\n").filter(Boolean)) {
-          try {
-            const obj = JSON.parse(line) as Record<string, unknown>;
-            if (typeof obj.stream === "string") out.push(obj.stream);
-            else if (typeof obj.status === "string") {
-              const detail = obj.progressDetail as { current?: number; total?: number } | undefined;
-              const progress = detail?.current != null ? ` ${detail.current}/${detail.total}` : "";
-              out.push(`${obj.status}${obj.id ? ` ${obj.id}` : ""}${progress}\n`);
-            }
-            if (typeof obj.error === "string") {
-              hasError = true;
-              out.push(`error: ${obj.error}\n`);
-            }
-          } catch {
-            out.push(line + "\n");
-          }
-        }
-      });
-      src.on("end", () => out.end());
-      src.on("error", (err: Error) => out.destroy(err));
+      dockerode.followProgress(
+        src,
+        (err) => {
+          resolveExit(err ? 1 : 0);
+          out.end();
+        },
+        (event) => {
+          if (event.stream) out.push(event.stream);
+          else if (event.error) out.push(`ERROR: ${event.error}\n`);
+        },
+      );
 
-      return { stream: out, getExitCode: async () => (hasError ? 1 : 0), raw: true };
+      return {
+        stream: out,
+        getExitCode: () => exitCodePromise,
+        raw: true,
+      };
     }),
+
+  /**
+   * Pull an image from a registry, resolving once the pull completes.
+   *
+   * Needed because {@link container.run} creates containers via the Docker
+   * Engine API, which — unlike the `docker run` CLI — does not auto-pull a
+   * missing image. Call this first when the image may not be present locally.
+   * @param name - Image name with optional tag. Example: "alpine:latest"
+   */
+  pull: async (name: string): Promise<void> => {
+    const stream = await dockerode.pull(name);
+    await new Promise<void>((resolve, reject) =>
+      dockerode.followProgress(stream, (err) =>
+        err ? reject(err) : resolve(),
+      ),
+    );
+  },
 
   /**
    * Remove a local image.
@@ -279,11 +356,23 @@ export const container = {
       getExitCode: async () => (await resolve(container).wait()).StatusCode,
     })),
 
-  /**
-   * Remove a container.
-   * @param container - The container name or id or Dockerode.Container instance.
-   * @param force - Force removal without stopping. Default: true
-   */
-  remove: async (container: Container.Instance, force = true) =>
-    resolve(container).remove({ force }),
+  ...(() => {
+    /**
+     * Remove a container.
+     * @param container - The container name or id or Dockerode.Container instance.
+     * @param force - Force removal without stopping. Default: true
+     */
+    const remove = async (container: Container.Instance, force = true) =>
+      resolve(container).remove({ force });
+
+    return {
+      remove,
+      /**
+       * Attempt to remove a container.
+       * @param container - The container name or id or Dockerode.Container instance.
+       * @param force - Force removal without stopping. Default: true
+       */
+      tryRemove: tryer(remove),
+    };
+  })(),
 };
