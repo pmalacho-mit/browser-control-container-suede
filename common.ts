@@ -5,7 +5,7 @@ import {
 } from "node:http";
 import type { Socket } from "node:net";
 import { after, afterEach, before, beforeEach, describe } from "node:test";
-import { getDevcontainerIp } from "./programmatic-docker-suede/devcontainer.js";
+import devcontainer from "./programmatic-docker-suede/devcontainer.js";
 import { type Browser, browsers, playwright } from "./release";
 import defaults from "./release/defaults.js";
 
@@ -23,7 +23,7 @@ const slugify = (value: string) =>
 export const startTestServer = async (
   handler: string | RequestHandler,
 ): Promise<{ url: string; port: number; close: () => Promise<void> }> => {
-  const ip = getDevcontainerIp();
+  const ip = devcontainer.ip();
 
   const requestHandler: RequestHandler =
     typeof handler === "string"
