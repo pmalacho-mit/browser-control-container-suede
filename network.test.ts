@@ -18,12 +18,12 @@ suite(
   (fixture) => {
     test("network lists page requests", async () => {
       await new Promise((r) => setTimeout(r, 500));
-      const network = await playwright.run(fixture.container, ["network"], {
+      const requests = await playwright.run(fixture.container, ["requests"], {
         session: fixture.session,
       });
-      assert.equal(network.exit, 0, network.err);
-      assert.match(network.out, /api\/data/);
-      assert.match(network.out, /missing/);
+      assert.equal(requests.exit, 0, requests.err);
+      assert.match(requests.out, /api\/data/);
+      assert.match(requests.out, /missing/);
     });
 
     test("route-list reflects added and removed routes", async () => {
