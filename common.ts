@@ -5,7 +5,7 @@ import {
 } from "node:http";
 import type { Socket } from "node:net";
 import { after, afterEach, before, beforeEach, describe } from "node:test";
-import devcontainer from "./programmatic-docker-suede/devcontainer.js";
+import devcontainer from "./browser-control-container-suede.programmatic-docker-suede/devcontainer.js";
 import { type Browser, browsers, playwright } from "./release";
 import defaults from "./release/defaults.js";
 

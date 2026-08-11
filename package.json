@@ -10,7 +10,9 @@
     "firefox": "node --import tsx release/browsers/firefox.ts"
   },
   "dependencies": {
-    "dockerode": "^5.0.0"
+    "dockerode": "^5.0.0",
+    "@types/dockerode": "^4.0.1",
+    "@types/node": "^25.6.0"
   },
   "devDependencies": {
     "@playwright/cli": "0.1.13",
