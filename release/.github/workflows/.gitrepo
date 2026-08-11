@@ -4,9 +4,9 @@
 ; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
 ;
 [subrepo]
-	remote = https://github.com/pmalacho-mit/browser-control-container-suede
-	branch = release
-	commit = b59926c1088827876b3f362687d964b3cadc5c0a
-	parent = 2e43a7f1700f44bc7c0e4ce9c7601067cc73ca1e
+	remote = https://github.com/pmalacho-mit/suede.git
+	branch = dependency/release/workflows
+	commit = 8d0fe504f17bd8216722e66b28220cdcfa1d507f
+	parent = fc50413ccacd75f36dd6dcf62ce71f473db579e6
 	method = merge
 	cmdver = 0.4.9
