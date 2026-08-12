@@ -1,7 +1,9 @@
-import { browsers, tryRemove } from "./release";
+import { container } from "./browser-control-container-suede.programmatic-docker-suede";
+import { browsers } from "./release";
+import defaults from "./release/defaults";
 
 await Promise.allSettled(
-  browsers.map((browser) => tryRemove(browser, { log: true })),
+  browsers.map(defaults.container).map((browser) => container.tryRemove(browser)),
 );
 
 console.log("Posttest cleanup complete.");
