@@ -53,10 +53,17 @@ const forwardedBy = (info: { Config?: { Env?: string[] | null } }) =>
     .find((entry) => entry.startsWith("FORWARD="))
     ?.slice("FORWARD=".length) ?? "";
 
-/** A running container is only reusable if it forwards what was asked for. */
-const isReusable = async (name: string, forward: string) => {
-  if (!(await container.isRunning(name))) return false;
-  return forwardedBy(await container.inspect(name)) === forward;
+/**
+ * The id of the running container named `name`, when it already forwards what
+ * is being asked for and so can be reused; otherwise nothing.
+ *
+ * The id, rather than a boolean, because reusing resolves the handle by it —
+ * see {@link buildAndRun}.
+ */
+const reusableId = async (name: string, forward: string) => {
+  if (!(await container.isRunning(name))) return undefined;
+  const info = await container.inspect(name);
+  return forwardedBy(info) === forward ? info.Id : undefined;
 };
 
 /**
@@ -71,15 +78,23 @@ export const buildAndRun = async (BROWSER: Browser, details?: Options) => {
   const forward = await encodeForwards(details?.forward ?? [], details?.network);
   const trusted = details?.trustCertificates ?? [];
 
-  if (details?.skipIfRunning && (await isReusable(name, forward))) {
+  const reusable = details?.skipIfRunning
+    ? await reusableId(name, forward)
+    : undefined;
+
+  if (reusable) {
     if (details?.log)
       console.log(
         `Reusing existing running container for ${BROWSER} (${name})`,
       );
     await certificates.install(name, trusted);
-    // container.resolve returns a Dockerode.Container handle for an existing container,
-    // matching the return type of container.run below.
-    return container.resolve(name);
+    /**
+     * Resolved by id rather than by name, so the handle this returns reports
+     * the same `id` that `container.run` below does. Resolving by name would
+     * hand back a handle whose `id` is the name, which works against the API
+     * but does not compare equal to the one a freshly started container has.
+     */
+    return container.resolve(reusable);
   }
 
   const tag = (details?.image ?? defaults.image)(BROWSER);

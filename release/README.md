@@ -75,6 +75,14 @@ await buildAndRun("chromium", {
 paths work too. Installing is idempotent, and also runs when a container is
 reused, so a newly added certificate takes effect without replacing it.
 
+Open the browser *after* installing, though. Chromium reads its certificate
+database once, when it starts: a browser that was already running when the
+certificate arrived goes on rejecting the origin, and only one launched
+afterwards trusts it. Firefox and WebKit consult the system store per
+connection and pick it up straight away. Since `buildAndRun` installs before
+anything is launched, this only comes up when installing into a container whose
+browser is already open.
+
 `docker/trust.mjs` does the work. There are two stores to write to, not three:
 
 | Browser  | Reads                                       |
