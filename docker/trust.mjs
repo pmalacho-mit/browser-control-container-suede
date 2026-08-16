@@ -1,23 +1,16 @@
 import { execFileSync } from "node:child_process";
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { useSystemRoots } from "./roots.mjs";
 
 /**
- * Adds a certificate to every store a browser in this image consults. There is
- * no single one — each browser looks somewhere different:
+ * Adds a certificate to the stores the browsers in this image read. There are
+ * two, not three:
  *
- *   - Chromium reads an NSS database at ~/.pki/nssdb.
- *   - WebKit goes through glib-networking, which reads the system store.
- *   - Firefox reads a database inside its profile, and Playwright starts from a
- *     fresh profile every launch, so the certificate is declared as an
- *     enterprise policy instead. Firefox applies those to every profile.
+ *   - Firefox and WebKit both end up at the system store — WebKit through
+ *     glib-networking, Firefox through the roots module `roots.mjs` installs.
+ *   - Chromium reads an NSS database at ~/.pki/nssdb, and nothing else.
  *
  * Usage: node /trust.mjs <nickname> <certificate, base64 encoded>
  */
@@ -25,7 +18,6 @@ const [nickname, base64] = process.argv.slice(2);
 
 const SYSTEM_CERTIFICATES = "/usr/local/share/ca-certificates";
 const NSS_DATABASE = join(homedir(), ".pki", "nssdb");
-const PLAYWRIGHT_BROWSERS = join(homedir(), ".cache", "ms-playwright");
 
 const run = (command, args) => execFileSync(command, args, { stdio: "pipe" });
 
@@ -37,7 +29,12 @@ const attempt = (command, args) => {
   }
 };
 
-/** What OpenSSL and glib-networking read, and so what WebKit trusts. */
+const write = (path, contents) => {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, contents);
+};
+
+/** What OpenSSL, glib-networking and p11-kit read, and so what all but Chromium trust. */
 const system = () => run("update-ca-certificates", []);
 
 /** What Chromium reads. */
@@ -46,54 +43,19 @@ const nss = (certificate) => {
   const database = `sql:${NSS_DATABASE}`;
   attempt("certutil", ["-d", database, "-N", "--empty-password"]);
   attempt("certutil", ["-d", database, "-D", "-n", nickname]);
-  run("certutil", ["-d", database, "-A", "-t", "C,,", "-n", nickname, "-i", certificate]);
+  run("certutil", [
+    "-d", database, "-A", "-t", "C,,", "-n", nickname, "-i", certificate,
+  ]);
 };
 
-const installationsOf = (browser) =>
-  existsSync(PLAYWRIGHT_BROWSERS)
-    ? readdirSync(PLAYWRIGHT_BROWSERS)
-        .filter((name) => name.startsWith(`${browser}-`))
-        .map((name) => join(PLAYWRIGHT_BROWSERS, name, browser))
-        .filter(existsSync)
-    : [];
-
-const parse = (file) => {
-  try {
-    return JSON.parse(readFileSync(file, "utf-8"));
-  } catch {
-    return {};
-  }
-};
-
-const including = (existing, certificate) => {
-  const certificates = existing.policies?.Certificates ?? {};
-  const install = new Set([...(certificates.Install ?? []), certificate]);
-  return {
-    ...existing,
-    policies: {
-      ...existing.policies,
-      Certificates: { ...certificates, Install: [...install] },
-    },
-  };
-};
-
-/** What Firefox applies to every profile it opens, however fresh. */
-const firefox = (certificate) => {
-  for (const installation of installationsOf("firefox")) {
-    const policies = join(installation, "distribution", "policies.json");
-    mkdirSync(dirname(policies), { recursive: true });
-    writeFileSync(
-      policies,
-      JSON.stringify(including(parse(policies), certificate), null, 2),
-    );
-  }
-};
-
-/** Kept where the system store expects it, so every mechanism can point at it. */
 const certificate = join(SYSTEM_CERTIFICATES, `${nickname}.crt`);
-mkdirSync(SYSTEM_CERTIFICATES, { recursive: true });
-writeFileSync(certificate, Buffer.from(base64, "base64"));
+write(certificate, Buffer.from(base64, "base64"));
 
 system();
 nss(certificate);
-firefox(certificate);
+
+/**
+ * Re-applied here as well as at build time, so a Firefox that Playwright
+ * downloaded after the image was built still reads the system store.
+ */
+useSystemRoots();

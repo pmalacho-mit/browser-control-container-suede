@@ -50,12 +50,17 @@ await buildAndRun("chromium", {
 Changing what is forwarded is a reason to replace the container, so
 `skipIfRunning` only reuses one that already forwards the same thing.
 
+Bind the server being forwarded to `0.0.0.0`. A forward dials the devcontainer
+at whichever address a container on that network reaches it by, and under
+docker-in-docker that is the network's gateway rather than the address the
+devcontainer sees on its own interfaces — so a server bound to just the latter
+has nothing listening where the forward arrives.
+
 ## Certificates
 
-Chromium reads its roots from an NSS database rather than the system store, so
-a certificate this machine trusts — an intercepting proxy's CA, say — means
-nothing to the browser until it is added there. Without it, every cross-origin
-`https` request fails as a bare `TypeError: Failed to fetch`.
+A certificate this machine trusts — an intercepting proxy's CA, say — means
+nothing to a browser in the container, which carries its own roots. Without it,
+every cross-origin `https` request fails as a bare `TypeError: Failed to fetch`.
 
 ```ts
 import { buildAndRun, certificates } from "./index.js";
@@ -70,60 +75,47 @@ await buildAndRun("chromium", {
 paths work too. Installing is idempotent, and also runs when a container is
 reused, so a newly added certificate takes effect without replacing it.
 
-`docker/trust.mjs` does the work, and writes to each place a browser might look:
+`docker/trust.mjs` does the work. There are two stores to write to, not three:
 
-| Browser  | Reads                                   | Status                     |
-| -------- | --------------------------------------- | -------------------------- |
-| Chromium | an NSS database at `~/.pki/nssdb`        | works                      |
-| WebKit   | the system store, via glib-networking    | works                      |
-| Firefox  | a database inside the profile            | **not working** — see below |
+| Browser  | Reads                                       |
+| -------- | ------------------------------------------- |
+| Chromium | an NSS database at `~/.pki/nssdb`           |
+| WebKit   | the system store, via glib-networking       |
+| Firefox  | the system store, via the module below      |
 
-Measured against an origin behind an intercepting proxy, loading the page with
-and without the certificate installed:
+`certificates.test.ts` measures this against a certificate authority it
+generates for the run, so nothing trusts it until it is installed and the
+negative control means what it says. Every browser rejects the origin before,
+and loads it after.
 
-```
-chromium without the CA: blocked (net::ERR_CERT_AUTHORITY_INVALID)
-chromium with the CA:    loaded
-webkit   without the CA: loaded      ← base image already trusted it
-webkit   with the CA:    loaded
-firefox  without the CA: blocked (SEC_ERROR_UNKNOWN_ISSUER)
-firefox  with the CA:    blocked (SEC_ERROR_UNKNOWN_ISSUER)
-```
+### Firefox reads the system store, once it is given somewhere to read it from
 
-WebKit's row has no negative control: the image is built `FROM
-node:22-bookworm-slim`, and on this machine that base already carried the CA in
-its system store. The result is consistent with WebKit reading the system store,
-but does not prove `update-ca-certificates` is what did it. Building the image
-from a base without the certificate would settle it.
+Firefox does not consult the system store on Linux; NSS answers from a loadable
+PKCS#11 module named `libnssckbi.so`, sitting next to the binary. Playwright's
+Firefox ships without one, and the mechanisms that would otherwise let a root in
+are all unavailable in that build:
 
-### Firefox, and what has been ruled out
+- **A profile's own `cert9.db`** is discarded — Playwright creates a fresh
+  profile for every launch.
+- **[Enterprise policies](https://mozilla.github.io/policy-templates/#certificates)**
+  never run. Firefox deliberately ignores local policies on a Nightly build
+  under automation, which is exactly what this is, and the provider Playwright
+  patched in to replace them reads a single preference,
+  `browser.policies.alternatePath`. Setting it changes nothing, because
+  `policies-startup` is never fired and so nothing reads it.
+- **AutoConfig** (`general.config.filename`) does not run either, whether the
+  preference is set as a default in the installation or as a user preference in
+  the profile.
 
-Playwright starts Firefox from a fresh profile every launch, so writing into a
-profile's `cert9.db` is pointless. `trust.mjs` therefore declares the
-certificate as an [enterprise
-policy](https://mozilla.github.io/policy-templates/#certificates), which Firefox
-is meant to apply to every profile it opens.
+`docker/roots.mjs` supplies the missing module: p11-kit ships one with the same
+interface that answers from the system store rather than a compiled-in list.
+Linking it in where NSS looks makes `update-ca-certificates` the single thing
+deciding what Firefox trusts — the same store WebKit already reads. This is what
+Debian's own Firefox packaging does.
 
-The file is written and is well formed, in every installed version:
-
-```
-~/.cache/ms-playwright/firefox-1522/firefox/distribution/policies.json
-{ "policies": { "Certificates": { "Install": ["/usr/local/share/ca-certificates/desolate-proxy.crt"] } } }
-```
-
-Firefox still rejects the certificate. Leads, roughly in order:
-
-1. Read `about:policies#errors` in the launched browser — it says whether the
-   policy engine ran at all, and whether it rejected this entry.
-2. Playwright's Firefox is a patched build; enterprise policies may be compiled
-   out of it. If so, `Certificates.Install` can never work and the mechanism
-   should be dropped rather than left in place.
-3. `/etc/firefox/policies/policies.json` is the other location Firefox reads on
-   Linux, and is worth trying before concluding the engine is absent.
-4. Failing all of that, the honest fallback is `ignoreHTTPSErrors` at the
-   Playwright context level — a much larger hammer, since it disables
-   verification entirely, and one this package cannot reach from outside
-   `playwright-cli`.
+It is applied at build time, so a container resolves roots the same way whether
+or not a certificate is ever added, and again on install, so a Firefox that
+Playwright downloaded after the image was built is covered too.
 
 ## CLI Usage
 
