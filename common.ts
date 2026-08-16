@@ -3,6 +3,7 @@ import {
   type IncomingMessage,
   type ServerResponse,
 } from "node:http";
+import { createServer as createSecureServer } from "node:https";
 import type { Socket } from "node:net";
 import { after, afterEach, before, beforeEach, describe } from "node:test";
 import devcontainer from "./browser-control-container-suede.programmatic-docker-suede/devcontainer.js";
@@ -20,8 +21,12 @@ const slugify = (value: string) =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 40);
 
+/** PEM key and certificate, to serve over `https` instead of `http`. */
+export type ServerCertificate = { key: string; cert: string };
+
 export const startTestServer = async (
   handler: string | RequestHandler,
+  certificate?: ServerCertificate,
 ): Promise<{ url: string; port: number; close: () => Promise<void> }> => {
   const ip = devcontainer.ip();
 
@@ -33,7 +38,9 @@ export const startTestServer = async (
         }
       : handler;
 
-  const server = createServer(requestHandler);
+  const server = certificate
+    ? createSecureServer(certificate, requestHandler)
+    : createServer(requestHandler);
   const sockets = new Set<Socket>();
 
   server.on("connection", (socket) => {
@@ -41,8 +48,16 @@ export const startTestServer = async (
     socket.on("close", () => sockets.delete(socket));
   });
 
+  /**
+   * Every interface, not just `devcontainer.ip()`. A container reaches the
+   * devcontainer at whichever address `devcontainer.ip.inspect()` resolves for
+   * its network, and under docker-in-docker that is the network's gateway
+   * rather than the address `devcontainer.ip()` reports. A forwarded port is
+   * dialled at the former, so binding only the latter leaves nothing to
+   * answer it.
+   */
   await new Promise<void>((resolve) => {
-    server.listen(0, ip, () => resolve());
+    server.listen(0, "0.0.0.0", () => resolve());
   });
 
   const addr = server.address();
@@ -50,7 +65,7 @@ export const startTestServer = async (
     throw new Error("Could not determine server address");
 
   const port = addr.port;
-  const url = `http://${ip}:${port}`;
+  const url = `${certificate ? "https" : "http"}://${ip}:${port}`;
 
   return {
     url,
