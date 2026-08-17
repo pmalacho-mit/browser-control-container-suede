@@ -32,8 +32,13 @@ suite(
       const list = await playwright.run(fixture.container, ["tab-list"], {
         session: fixture.session,
       });
-      assert.match(list.out, /- 0:/);
-      assert.match(list.out, /1: \(current\)/);
+      /**
+       * Anchored to the start of a `tab-list` entry. An unanchored `1:` also
+       * matches inside the URL these entries carry — an address ending in `.1`
+       * is enough — which is a false match rather than a tab index.
+       */
+      assert.match(list.out, /^- 0:/m);
+      assert.match(list.out, /^- 1: \(current\)/m);
       assert.match(list.out, /tab=2/);
     });
 
@@ -54,7 +59,7 @@ suite(
       const list = await playwright.run(fixture.container, ["tab-list"], {
         session: fixture.session,
       });
-      assert.match(list.out, /1: \(current\)/);
+      assert.match(list.out, /^- 1: \(current\)/m);
     });
 
     test("tab-close removes a tab", async () => {
@@ -74,7 +79,7 @@ suite(
       const list = await playwright.run(fixture.container, ["tab-list"], {
         session: fixture.session,
       });
-      assert.doesNotMatch(list.out, /1:/);
+      assert.doesNotMatch(list.out, /^- 1:/m);
     });
   },
 );
