@@ -26,6 +26,20 @@ const forward = ({ port, host, target }) =>
       browser.on("error", () => {});
       server.on("error", () => {});
     })
+    /**
+     * Without this, a port that cannot be bound — a duplicate entry, or
+     * something already listening — raises an unhandled `error` out of PID 1
+     * and takes the container with it. The container is then removed on stop,
+     * so the next thing to touch it fails with "no such container", pointing
+     * nowhere near the cause. Reporting it and leaving the container up keeps
+     * the other forwards working and the reason visible in `docker logs`.
+     */
+    .on("error", (error) => {
+      console.error(
+        `forwarding localhost:${port} to ${host}:${target} failed: ${error.message}`,
+      );
+      process.exitCode = 1;
+    })
     .listen(port, "127.0.0.1", () =>
       console.log(`forwarding localhost:${port} to ${host}:${target}`),
     );
@@ -35,5 +49,12 @@ const forward = ({ port, host, target }) =>
   .filter(Boolean)
   .map(parse)
   .forEach(forward);
+
+/**
+ * As PID 1 there is no default signal disposition, so without these `docker
+ * stop` waits out its full timeout before resorting to SIGKILL.
+ */
+for (const signal of ["SIGTERM", "SIGINT"])
+  process.on(signal, () => process.exit(0));
 
 setInterval(() => {}, 1 << 30);

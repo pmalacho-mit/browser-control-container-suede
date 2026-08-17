@@ -75,6 +75,20 @@ const reusableId = async (name: string, forward: string) => {
  */
 export const buildAndRun = async (BROWSER: Browser, details?: Options) => {
   const name = (details?.container ?? defaults.container)(BROWSER);
+
+  /**
+   * `/forward.mjs` is what serves the forwards, and it is the default command
+   * rather than something the container does on its own. Replacing the command
+   * without running it would leave `FORWARD` set and nothing acting on it —
+   * forwards would silently do nothing, and a container in that state still
+   * looks correctly configured to {@link reusableId}.
+   */
+  if (details?.forward?.length && details?.command)
+    throw new Error(
+      "A custom `command` must run /forward.mjs itself to serve `forward`; " +
+        "otherwise the forwarded ports are never listened on.",
+    );
+
   const forward = await encodeForwards(details?.forward ?? [], details?.network);
   const trusted = details?.trustCertificates ?? [];
 

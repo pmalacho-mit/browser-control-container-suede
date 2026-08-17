@@ -56,6 +56,25 @@ docker-in-docker that is the network's gateway rather than the address the
 devcontainer sees on its own interfaces — so a server bound to just the latter
 has nothing listening where the forward arrives.
 
+### Forwarding an `https` server
+
+A forward is a TCP pipe rather than a proxy: it rewrites nothing, so the
+browser performs the TLS handshake against the upstream while using `localhost`
+as the name.
+
+**The server's certificate has to cover `localhost`.** Trusting its root is
+necessary but not sufficient — a certificate issued only for the devcontainer's
+address fails on the forwarded route even when the root is fully trusted, and
+the browser reports it as a trust failure rather than the name mismatch it
+actually is. With mkcert, or Vite's HTTPS options, include `localhost` among
+the names when generating the certificate.
+
+For the same reason, a `host` pointing anywhere other than the devcontainer is
+for plain `http`. No publicly issued certificate carries `localhost`, so an
+`https` endpoint on another host cannot be made to validate through a forward.
+Terminating TLS inside the container would be the way to support that, and is
+not something this package does today.
+
 ## Certificates
 
 A certificate this machine trusts — an intercepting proxy's CA, say — means
@@ -82,6 +101,12 @@ afterwards trusts it. Firefox and WebKit consult the system store per
 connection and pick it up straight away. Since `buildAndRun` installs before
 anything is launched, this only comes up when installing into a container whose
 browser is already open.
+
+Prefer `trustCertificates` to calling `certificates.install` yourself. Changing
+`forward` is a reason to replace the container, and a certificate installed
+out-of-band goes with the container it was installed into; one passed to
+`buildAndRun` is reinstalled on every call, so it survives both replacement and
+reuse.
 
 `docker/trust.mjs` does the work. There are two stores to write to, not three:
 

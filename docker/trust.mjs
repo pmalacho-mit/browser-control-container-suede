@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { useSystemRoots } from "./roots.mjs";
 
@@ -37,22 +37,50 @@ const write = (path, contents) => {
 /** What OpenSSL, glib-networking and p11-kit read, and so what all but Chromium trust. */
 const system = () => run("update-ca-certificates", []);
 
-/** What Chromium reads. */
-const nss = (certificate) => {
+/**
+ * A single PEM file may carry a whole chain, which corporate roots commonly
+ * do. `update-ca-certificates` takes the file as it stands, but `certutil -A`
+ * reads only the first certificate in it — so without splitting, Chromium
+ * silently ends up trusting the first and missing the rest, and the failures
+ * that causes look nothing like a missing intermediate.
+ */
+const PEM = /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g;
+
+/** What Chromium reads. One certificate per `certutil` call. */
+const nss = (certificate, contents) => {
   mkdirSync(NSS_DATABASE, { recursive: true });
   const database = `sql:${NSS_DATABASE}`;
   attempt("certutil", ["-d", database, "-N", "--empty-password"]);
-  attempt("certutil", ["-d", database, "-D", "-n", nickname]);
-  run("certutil", [
-    "-d", database, "-A", "-t", "C,,", "-n", nickname, "-i", certificate,
-  ]);
+
+  const add = (named, path) => {
+    attempt("certutil", ["-d", database, "-D", "-n", named]);
+    run("certutil", [
+      "-d", database, "-A", "-t", "C,,", "-n", named, "-i", path,
+    ]);
+  };
+
+  /** Not PEM at all — DER, say — so hand the file over as it is. */
+  const blocks = contents.toString("utf-8").match(PEM);
+  if (!blocks) return add(nickname, certificate);
+
+  blocks.forEach((block, index) => {
+    const named = index === 0 ? nickname : `${nickname}-${index}`;
+    const path = join(tmpdir(), `${named}.pem`);
+    writeFileSync(path, `${block}\n`);
+    try {
+      add(named, path);
+    } finally {
+      rmSync(path, { force: true });
+    }
+  });
 };
 
+const contents = Buffer.from(base64, "base64");
 const certificate = join(SYSTEM_CERTIFICATES, `${nickname}.crt`);
-write(certificate, Buffer.from(base64, "base64"));
+write(certificate, contents);
 
 system();
-nss(certificate);
+nss(certificate, contents);
 
 /**
  * Re-applied here as well as at build time, so a Firefox that Playwright
