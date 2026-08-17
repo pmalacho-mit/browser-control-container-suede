@@ -28,8 +28,6 @@ export const startTestServer = async (
   handler: string | RequestHandler,
   certificate?: ServerCertificate,
 ): Promise<{ url: string; port: number; close: () => Promise<void> }> => {
-  const ip = devcontainer.ip();
-
   const requestHandler: RequestHandler =
     typeof handler === "string"
       ? (_, response) => {
@@ -65,7 +63,14 @@ export const startTestServer = async (
     throw new Error("Could not determine server address");
 
   const port = addr.port;
-  const url = `${certificate ? "https" : "http"}://${ip}:${port}`;
+
+  /**
+   * The address a browser in a container reaches this server at, which is what
+   * `url` is for. Not `devcontainer.ip()`: that reports the first non-internal
+   * interface the devcontainer itself sees, which under docker-in-docker is on
+   * a different network from the browser and need not be routable from it.
+   */
+  const url = `${certificate ? "https" : "http"}://${await devcontainer.ip.inspect()}:${port}`;
 
   return {
     url,

@@ -28,4 +28,7 @@ COPY trust.mjs /trust.mjs
 # whether or not a certificate is ever added. A no-op without Firefox.
 RUN node /roots.mjs
 
-CMD ["bash"]
+# The same command `defaults.command` runs: it idles so the container stays up
+# to be exec'd into, and serves whatever `FORWARD` asks for. `bash` here would
+# exit immediately under `docker run -d`, taking the container with it.
+CMD ["node", "/forward.mjs"]

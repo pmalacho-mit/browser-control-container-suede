@@ -37,7 +37,13 @@ describe("top-level: certificates", { concurrency: true }, () => {
        */
       before(async () => {
         await playwright.ready(container);
-        ca = await authority(devcontainer.ip());
+        /**
+         * Both addresses, because which one a container reaches the
+         * devcontainer at depends on the docker topology and the two differ
+         * under docker-in-docker. Covering both keeps the certificate valid
+         * wherever `startTestServer` decides to advertise itself.
+         */
+        ca = await authority(devcontainer.ip(), await devcontainer.ip.inspect());
         server = await startTestServer(page, ca.server);
       });
 
